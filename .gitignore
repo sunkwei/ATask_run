@@ -1,0 +1,6 @@
+__pycache__/
+model/
+*.log
+run/
+config/
+config_temp/
