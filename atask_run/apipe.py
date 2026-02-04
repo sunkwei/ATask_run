@@ -64,7 +64,7 @@ class APipe:
         ## 队列
         self.Q_inp = Queue(maxsize=Q_inp_size)
         self.Q_inp_sub = Queue()
-        self.Q_pre = Queue()
+        self.Q_pre = Queue(maxsize=Q_inp_size * 2)
         self.Q_infer = Queue()
         self.Q_result = Queue()     ## 所有 todo 均完成的 task 队列
 
@@ -112,6 +112,7 @@ class APipe:
             logger.error(f"unsupported todo {task.todo:b} vs {self.__supported_todo:b}")
             raise Exception("unsupported todo")
         
+        logger.debug("APipe: pending: {}".format(self.get_qsize()))
         self.Q_inp.put(task)
 
     def wait(self) -> ATask:
@@ -120,9 +121,9 @@ class APipe:
         '''
         return self.Q_result.get()
 
-    def get_qsize(self) -> Tuple[int, int, int, int]:
+    def get_qsize(self) -> Tuple[int, int, int, int, int]:
         ## 返回四个 queue 的等待数，一定程度上可以用于评估性能瓶颈
-        return self.Q_inp.qsize(), self.Q_pre.qsize(), self.Q_infer.qsize(), self.Q_result.qsize()
+        return self.Q_inp.qsize(), self.Q_inp_sub.qsize(), self.Q_pre.qsize(), self.Q_infer.qsize(), self.Q_result.qsize()
     
     def __get_model_from_todo(self, task:ATask) -> AModel | None:
         ## 被执行器调用，根据模型顺序，以及 task 剩余的 todo 位，找到对应的模型
@@ -139,6 +140,18 @@ class APipe:
             # (mid, instance)
         ]
         for cfg in self.__model_desc:
+            '''
+                cfg:
+                {
+                    "name": "act",
+                    "mid": 1,
+                    "model_path": "....onnx",
+                    "depend": [],
+                    "backend": [
+                        { "type": "onnxruntime", "backend_cfg": { ... }}
+                    ]
+                }
+            '''
             name = cfg['name']
             mid = cfg['mid']
             if mid == DO_ASR_VAD:
@@ -146,11 +159,11 @@ class APipe:
                 continue
             
             ## 从 f"models/{name}.py" 中 import f"Model_name" 类，并实例化
-            logger.info(f"APipe: load_models: load {name} from ./models.{name}")
+            # logger.info(f"APipe: load_models: load {name} from ./models.{name}")
             module = importlib.import_module(f".models.{name}", package=__package__)
             cls = getattr(module, f"Model_{name}")
             model = cls(**cfg)
-            logger.info(f"APipe: load_models: load {name} instance={model}")
+            logger.info(f"APipe: load_models: load {name} success, {model}")
             models.append((mid, model))
 
         return models

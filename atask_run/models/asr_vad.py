@@ -17,7 +17,7 @@ logger = logging.getLogger("vad")
 
         asr 使用最大 15秒输入，所以每个合并段不超过 15秒，若连续段间隔小于 1秒，则合并
 '''
-class Model_asr_vad(AModel):
+class Model_asr_vad:
     def __init__(self, model_path: str, **kwargs):
         # super().__init__("asr_vad", model_path, DO_ASR_VAD, backend, **kwargs)
         model_path = osp.dirname(model_path)

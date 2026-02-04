@@ -7,7 +7,7 @@ import json
 
 class Model_asr_dec(AModel):
     
-    def preprocess(self, task: ATask):
+    def _preprocess(self, task: ATask):
         assert "asr_enc_infer" in task.data and "asr_predictor_infer" in task.data, \
             f"'asr_enc_infer' or 'asr_predictor_infer' not found in task.data, {task.data.keys()}"
         
@@ -17,11 +17,11 @@ class Model_asr_dec(AModel):
         pre_token_mask = np.ones((1, 1, pre_token_length.astype(int)[0]), dtype=np.float32)
         task.data["asr_dec_inp"] = (enc, enc_mask, pre_acoustic_embeds, pre_token_mask)
         
-    def infer(self, task: ATask):
+    def _infer(self, task: ATask):
         assert "asr_dec_inp" in task.data, f"'asr_dec_inp' not found in task.data, {task.data.keys()}"
-        task.data["asr_dec_infer"] = self.impl().infer(task.data["asr_dec_inp"])
+        task.data["asr_dec_infer"] = self(task.data["asr_dec_inp"])
         
-    def postprocess(self, task: ATask):
+    def _postprocess(self, task: ATask):
         if not hasattr(self, "tokenizer"):
             model_path = osp.dirname(self.model_path())
             token_fname = osp.join(model_path, "asr_dec", "tokens.json")

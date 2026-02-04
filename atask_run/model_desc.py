@@ -67,51 +67,54 @@ def build_default_model_configs(
 
     def save(name, mid, inps, dep=[]):
         desc = {
-            "mid": mid,
+            "mid": mid,         ## DO_ACT, DO_FACEDET, ...
             "name": name,       ## XXX: 类实现名字总是 f"Model_{name}"，并且在 src.models.{name}.py 中实现
-            "model_path": f"{model_path}/{name}.onnx",
+            "model_path": f"{model_path}/{name}.onnx",      ## 模型路径，如果 backend 中提供，将覆盖该名字
             "input": inps,
             "depend": dep,
-            "backend": "onnxruntime",
-            "backend_cfg": {
-                "force_cpu": True,
+            "backend": [
+                {
+                    "type": "onnxruntime",
+                    "model_path": f"{model_path}/{name}.onnx",  ## backend 中的 model_path 将覆盖上面的 model_path
+                    "backend_cfg": {
+                        "force_cpu": True,          ## 是否强制使用 cpu
+                        "balance_ratio": 1,             ## 用于动态复制均衡比例，如果使用加速卡，设置 0.1 则 90% 分配给 gpu，10% 分配给 cpu
 
-                "intra_op_num_threads": 1,
-                "inter_op_num_threads": 1,
+                        "intra_op_num_threads": 1,  ## onnx 算子线程数
+                        "inter_op_num_threads": 1,
 
-                "providers": [
-                    "TensorrtExecutionProvider",
-                    "CUDAExecutionProvider",
-                    "CANNExecutionProvider",
-                    "OpenVINOExecutionProvider",
-                    "CPUExecutionProvider",
-                ],
+                        "providers": [                  ## onnx providers, 与 providers_cfg 的长度必须相同
+                            "TensorrtExecutionProvider",
+                            "CUDAExecutionProvider",
+                            "CANNExecutionProvider",
+                            "CPUExecutionProvider",
+                        ],
 
-                "providers_cfg": [  ## 注意，比如与 providers 数量相同
-                    {
-                        ## TensorrtExecutionProvider
-                        "device_id": 0,
-                        "trt_engine_cache_enable": True,
-                        "trt_engine_cache_path": "./run/cache",
-                        "trt_engine_cache_prefix": f"trt_{name}",
+                        "providers_cfg": [  ## 注意，比如与 providers 数量相同
+                            {
+                                ## TensorrtExecutionProvider
+                                "device_id": 0,
+                                "trt_engine_cache_enable": True,
+                                "trt_engine_cache_path": "./run/cache",
+                                "trt_engine_cache_prefix": f"trt_{name}",
+                            },
+                            {
+                                ## CUDAExecutionProvider
+                                "device_id": 0,
+                            },
+                            {
+                                ## CANNExecutionProvider
+                                "device_id": 0,
+                                "enable_cann_graph": True,
+                            },
+                            {
+                                ## CPUExecutionProvider
+                            },
+                        ]
                     },
-                    {
-                        ## CUDAExecutionProvider
-                        "device_id": 0,
-                    },
-                    {
-                        ## CANNExecutionProvider
-                        "device_id": 0,
-                        "enable_cann_graph": True,
-                    },
-                    {
-                        ## OpenVINOExecutionProvider
-                    },
-                    {
-                        ## CPUExecutionProvider
-                    },
-                ]
-            },
+                },
+                ## XXX: 此处支持多个 backend 实现
+            ],
         }
         with open(f"./{config_path}/{name}.yaml", 'w') as f:
             yaml.dump(desc, f)

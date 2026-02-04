@@ -5,7 +5,7 @@ from copy import copy
 from .asr_post import sentence_postprocess, time_stamp_lfr6_onnx
 
 class Model_asr_stamp(AModel):
-    def preprocess(self, task: ATask):
+    def _preprocess(self, task: ATask):
         assert "asr_enc_infer" in task.data and "asr_predictor_infer" in task.data
 
         task.data["asr_stamp_inp"] = (
@@ -14,10 +14,10 @@ class Model_asr_stamp(AModel):
             task.data["asr_predictor_infer"][1],       ## pre_token_length
         )
 
-    def infer(self, task: ATask):
-        task.data["asr_stamp_infer"] = self.impl().infer(task.data["asr_stamp_inp"])
+    def _infer(self, task: ATask):
+        task.data["asr_stamp_infer"] = self(task.data["asr_stamp_inp"])
 
-    def postprocess(self, task: ATask):
+    def _postprocess(self, task: ATask):
         assert "asr_dec_token" in task.data
         us_alphass, us_cif_peak = task.data["asr_stamp_infer"]
         token = task.data["asr_dec_token"]

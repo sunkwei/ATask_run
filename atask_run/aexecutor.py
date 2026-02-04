@@ -81,13 +81,13 @@ class AExecutor:
                 break
 
             if self.name == "pre":
-                model.preprocess(task)
+                model._preprocess(task)
                 self.out_q.put(task)
             elif self.name == "infer":
-                model.infer(task)
+                model._infer(task)
                 self.out_q.put(task)
             elif self.name == "post":
-                model.postprocess(task)
+                model._postprocess(task)
                 if not task.done(model.mid()):
                     self.out_q.put(task)
                 else:
@@ -105,9 +105,9 @@ class AExecutor:
             todo = task.curr_todo()
             model = self.__func_find_model(task)
             if isinstance(model, AModel):
-                model.preprocess(task)
-                model.infer(task)
-                model.postprocess(task)
+                model._preprocess(task)
+                model._infer(task)
+                model._postprocess(task)
 
                 if not task.done(model.mid()):
                     self.out_q.put(task)

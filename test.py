@@ -102,16 +102,22 @@ class Test(unittest.TestCase):
         self.assertEqual(segs[2], [17480, 20190])
         self.assertEqual(segs[3], [21510, 32070])
 
-    def test_726_asr_stream(self):
-        '''
-        模拟流式 asr：
-            loop:
-                读1分钟pcm
-                做 vad 得到 asr 片段
-                对所有 asr 片段执行 asr
-        
-        :param self: Description
-        '''
+    def _test_726_asr_stream(self):
+        """
+        模拟流式ASR处理流程，包括读取音频数据、进行VAD分割和ASR识别。
+
+        该函数测试流式ASR功能：
+        1. 读取音频文件数据
+        2. 通过VAD处理得到语音片段
+        3. 对所有语音片段执行ASR识别
+        4. 将结果保存为Audacity标签文件格式
+
+        Args:
+            self: 测试实例对象
+
+        Returns:
+            None: 结果将保存到RESULT_PATH/test_asr_726_stream.txt文件中
+        """
         wav_fname = TEST_726
         with APipeWrap(model_mask=mid.DO_ASR_ENCODE | mid.DO_ASR_PREDICTOR | mid.DO_ASR_DECODE | mid.DO_ASR_STAMP) as pipe:
             sess = ASRRunner(pipe)
@@ -172,7 +178,7 @@ if __name__ == "__main__":
             level=logging.INFO,
             filemode="w",
             filename="./test.log",
-            format="%(asctime)s %(levelname)-8s %(message)s",
+            format="%(asctime)s %(levelname)s [%(filename)s:%(lineno)s] %(message)s",
         )
 
     if args.build_model_config:

@@ -141,7 +141,7 @@ class ASRRunner:
         if begin_ms >= 0 and begin_ms < end_ms:
             vad_segs.append((begin_ms, end_ms))
 
-        logger.info(f"{self.__class__.__name__}: update_file: GOT {len(vad_segs)} segs, vad_segs={vad_segs}")
+        logger.debug(f"{self.__class__.__name__}: update_file: GOT {len(vad_segs)} segs, vad_segs={vad_segs}")
         
         for begin_ms, end_ms in vad_segs:
             begin_stamp = 16 * begin_ms; end_stamp = 16 * end_ms
@@ -152,7 +152,7 @@ class ASRRunner:
                 userdata={"begin_ms": begin_ms, "end_ms": end_ms, "total": len(vad_segs)}
             )
             self.__P.post_task(task)
-
+            
         th.join()
 
         ## XXX: results 必须重新排序

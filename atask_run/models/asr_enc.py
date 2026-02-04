@@ -6,7 +6,7 @@ import yaml
 import numpy as np
 
 class Model_asr_enc(AModel):
-    def preprocess(self, task: ATask):
+    def _preprocess(self, task: ATask):
         if not hasattr(self, "frontend"):
             model_path = osp.join(osp.dirname(self.model_path()), "asr_enc")
             if not osp.exists(model_path):
@@ -24,9 +24,9 @@ class Model_asr_enc(AModel):
         mask4 = np.ones((1, 1, 1, speech_len), dtype=np.float32)
         task.data["asr_enc_inp"] = (speech[None, ...], mask3, mask4)
     
-    def infer(self, task: ATask):
+    def _infer(self, task: ATask):
         assert "asr_enc_inp" in task.data, f"'asr_enc_inp' not found in task.data, {task.data.keys()}"
-        task.data["asr_enc_infer"] = self.impl().infer(task.data["asr_enc_inp"])
+        task.data["asr_enc_infer"] = self(task.data["asr_enc_inp"])
     
-    def postprocess(self, task: ATask):
+    def _postprocess(self, task: ATask):
         pass
