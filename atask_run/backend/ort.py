@@ -16,8 +16,6 @@ class OnnxruntimeBackend(AModelBackend):
         sess_opt.intra_op_num_threads = kwargs.get("intra_op_num_threads", 1)
         sess_opt.inter_op_num_threads = kwargs.get("inter_op_num_threads", 1)
 
-        logger.info(f"OnnxruntimeBackend model:{model_path}, options: {kwargs}")
-
         if kwargs.get("force_cpu", False):
             providers = ["CPUExecutionProvider"]
             provider_options = [{}]
@@ -35,11 +33,15 @@ class OnnxruntimeBackend(AModelBackend):
             sess_opt, 
             providers=[ (p, po) for p,po in zip(providers, provider_options) ],
         )
+
+        ## 实际使用的 privoider
+        self.__curr_p = self.sess.get_providers()[0]
+
         self.input_names = [i.name for i in self.sess.get_inputs()]
         self.output_names = [o.name for o in self.sess.get_outputs()]
 
     def __repr__(self) -> str:
-        info = f"OrtBackend: model:{self.model_path} with inputs({len(self.input_names)}) outputs({len(self.output_names)})"
+        info = f"OrtBackend: model:{self.model_path} P:{self.__curr_p}, with inputs({len(self.input_names)}) outputs({len(self.output_names)})"
         for i, name in enumerate(self.input_names):
             info += f"\n\tinput[{i}] {name}: shape={self.get_input_shape(i)}"
         for i, name in enumerate(self.output_names):

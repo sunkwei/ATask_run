@@ -35,11 +35,14 @@ class AModel:
         self.__mid = mid
         self.__model_path = model_path
 
+        logger.info(f"AModel: init: name:{name}, mid:{mid}, model_path:{model_path}, kwargs:{kwargs}")
+
         backends = kwargs.get("backend", [
             {
                 "type": "onnxruntime", 
                 "backend_cfg": {
                     "force_cpu": True,
+                    "balance_ratio": 1.0,
                     "intra_op_num_threads": 1,
                     "inter_op_num_threads": 1,
                     "providers": ["CPUExecutionProvider"],
@@ -56,12 +59,30 @@ class AModel:
 
         self.__backend_impls = []
         for i, backend in enumerate(backends):
-            if backend["type"] == "onnxruntime":
-                impl = OnnxruntimeBackend()
-                impl.setup(model_path, **backend["backend_cfg"])
+            if not "type" in backend:
+                raise ValueError("backend type is required")
 
-                ratio = backend.get("balance_ratio", 1.0)
+            if not "model_path" in backend:
+                backend["model_path"] = model_path  ## 默认填充
+
+            if backend["type"] == "onnxruntime":
+                if not "backend_cfg" in backend:
+                    backend["backend_cfg"] = {
+                        "force_cpu": True,
+                        "balance_ratio": 1.0,
+                        "intra_op_num_threads": 1,
+                        "inter_op_num_threads": 1,
+                        "providers": ["CPUExecutionProvider"],
+                        "providers_cfg": [
+                            {}
+                        ]
+                    }
+
+                impl = OnnxruntimeBackend()
+                impl.setup(backend["model_path"], **backend["backend_cfg"])
+                ratio = float(backend["backend_cfg"].get("balance_ratio", 1.0))
                 self.__balance_ratios[i] = ratio
+
             else:
                 # TODO: 实现其它的 backend
                 raise NotImplementedError
