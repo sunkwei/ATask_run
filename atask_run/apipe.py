@@ -34,6 +34,8 @@ from .amodel import AModel
 from .model_id import DO_ASR_VAD
 from typing import Tuple
 from queue import Queue
+import os.path as osp
+import yaml
 import logging
 
 logger = logging.getLogger("pipe")
@@ -41,10 +43,10 @@ logger = logging.getLogger("pipe")
 class APipe:
     def __init__(
         self,
-        Q_inp_size: int=4,
-        E_pre_num_thread: int=2,
-        E_infer_num_thread: int=2,
-        E_post_num_thread: int=2,
+        Q_inp_size: int=-1,
+        E_pre_num_thread: int=-1,
+        E_infer_num_thread: int=-1,
+        E_post_num_thread: int=-1,
         model_mask: int=-1,         ## 启用的模型 bitmask，默认启用所有
         model_config_path: str="./config",
         debug: bool=False,
@@ -52,6 +54,36 @@ class APipe:
     ):
         self.debug = debug
         self.debug_one_thread = debug_one_thread
+
+        Q_inp_sub_size = Q_infer_size = Q_result_size = -1
+        Q_pre_size = Q_inp_size * 5
+
+        if Q_inp_size == -1 or E_pre_num_thread == -1 or E_infer_num_thread == -1 or E_post_num_thread == -1:
+            cfg_fname = osp.join(model_config_path, "APipe.yaml")
+            if osp.exists(cfg_fname):
+                with open(cfg_fname, encoding="utf-8") as f:
+                    config = yaml.load(f, Loader=yaml.loader.FullLoader)
+                Q_inp_size = config.get("Q_inp_size", 4)
+                E_pre_num_thread = config.get("E_pre_num_thread", 2)
+                E_infer_num_thread = config.get("E_infer_num_thread", 2)
+                E_post_num_thread = config.get("E_post_num_thread", 2)
+
+        if Q_inp_size <= 0:
+            Q_inp_size = 4
+
+        if Q_pre_size <= 0:
+            Q_pre_size = Q_inp_size * 5
+
+        if E_pre_num_thread <= 0:
+            E_pre_num_thread = 2
+
+        if E_infer_num_thread <= 0:
+            E_infer_num_thread = 2
+
+        if E_post_num_thread <= 0:
+            E_post_num_thread = 2
+
+        logger.info(f"APipe: cfg: Q_inp_size:{Q_inp_size}, E_pre_num_thread:{E_pre_num_thread}, E_infer_num_thread:{E_infer_num_thread}, E_post_num_thread:{E_post_num_thread}")
 
         self.__supported_todo = 0
         self.__model_desc = load_model_config(model_config_path, model_mask)
@@ -62,11 +94,11 @@ class APipe:
             self.__supported_todo |= cfg["mid"] ## 所有支持的 todo 位
 
         ## 队列
-        self.Q_inp = Queue(maxsize=Q_inp_size)
-        self.Q_inp_sub = Queue()
-        self.Q_pre = Queue(maxsize=Q_inp_size * 2)
-        self.Q_infer = Queue()
-        self.Q_result = Queue()     ## 所有 todo 均完成的 task 队列
+        self.Q_inp = Queue(Q_inp_size)
+        self.Q_inp_sub = Queue(Q_inp_sub_size)
+        self.Q_pre = Queue(Q_pre_size)
+        self.Q_infer = Queue(Q_infer_size)
+        self.Q_result = Queue(Q_result_size)     ## 所有 todo 均完成的 task 队列
 
         ## 执行器
         def find_model(task:ATask) -> AModel | None:

@@ -15,6 +15,8 @@ python test.py --build_model_config
 ```
 将在 ./config_temp 目录下生成每个模型的配置文件，将其复制到 ./config 目录下，并根据实际情况修改配置文件。
 
+注意：其中 APipe.yaml 与众不同，包含 APipe 的默认配置
+
 ## 设计思路
 
 **将AI任务抽象为 ATask**，每个 ATask 包含：
@@ -84,6 +86,51 @@ class AModel:
 	def preprocess(self, task:ATask): ...
 	def infer(self, task:ATask): ...
 	def postprocess(self, task:ATask): ...
+```
+
+##### AModelBackend
+每个 AModel 必须绑定对应的 backend，目前仅仅支持 onnxruntime。
+一个 AModel 可能同时绑定多个 backend，根据模型配置，创建 backend 实例。
+
+``` python
+class AModelBackend:
+    def setup(self, model_path:str, **kwargs):
+		## 实例化后端，根据 kwargs 配置，该配置来自 config/model.yaml 的 backend_cfg 部分
+        pass
+
+    def teardown(self):
+		## 结束
+        pass
+
+    def get_input_num(self) -> int:
+        ## 返回模型的 input tensor 个数
+        return -1
+    
+    def get_input_shape(self, idx:int) -> tuple[int, ...]:
+        ## 返回第 idx 个 input tensor 的 shape
+        return (-1,)
+    
+    def get_input_dtype(self, idx:int) -> str:
+        ## 返回第 idx 个 input tensor 的 dtype
+        return ""
+
+    def get_output_num(self) -> int:
+        ## 返回模型的 output tensor 个数
+        return -1
+    
+    def get_output_shape(self, idx:int) -> tuple[int, ...]:
+        ## 返回第 idx 个 output tensor 的 shape
+        return (-1,)
+    
+    def get_output_dtype(self, idx:int) -> str:
+        ## 返回第 idx 个 output tensor 的 dtype
+        return ""    
+
+    def infer(self, inputs:Tuple[Any]) -> List[Any]:
+        ## 执行推理，输入 inputs 为一个列表，每个元素都是对应的 input tensor
+        ## 输出 outputs 也是一个列表，每个元素都是对应的 output tensor
+		## 派生类必须实现
+        raise NotImplementedError("infer not implemented")
 ```
 
 ##### AExecutor

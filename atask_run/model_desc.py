@@ -31,10 +31,13 @@ def load_model_config(
         with open(f, encoding="utf8") as f:
          cfg = yaml.load(f, Loader=yaml.loader.FullLoader)
         if "mid" not in cfg:
-            raise Exception(f"{f} has no mid")
+            ## 非有效模型配置
+            continue
+
         if (mod_mask & cfg["mid"]) == 0:
             logging.warning(f"skiping {f} for mod mask:{mod_mask:b}")
             continue
+        
         cfgs.append(cfg)
 
     ## 检查依赖关系
@@ -64,6 +67,21 @@ def build_default_model_configs(
     import os
     if not os.path.exists(config_path):
         os.makedirs(config_path)
+
+    ## 生成 APipe.yaml
+    with open(os.path.join(config_path, "APipe.yaml"), "w") as f:
+        cfg = {
+            "Q_inp_size": 4,
+            "Q_inp_sub_size": -1,
+            "Q_pre_size": 16,
+            "Q_infer_ize": -1,
+            "Q_result_size": -1,
+
+            "E_pre_num_thread": 2,
+            "E_infer_num_thread": 2,
+            "E_post_num_thread": 2,
+        }
+        yaml.dump(cfg, f)
 
     def save(name, mid, inps, dep=[]):
         desc = {
