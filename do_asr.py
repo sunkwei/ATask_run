@@ -2,10 +2,10 @@ import numpy as np
 from typing import cast
 import logging
 import threading
-from src.models.asr_vad import Model_asr_vad
-import src.model_id as mid
-from src.apipe import APipe
-from src.atask import ATask
+from atask_run.models.asr_vad import Model_asr_vad
+import atask_run.model_id as mid
+from atask_run.apipe import APipe
+from atask_run.atask import ATask
 
 logger = logging.getLogger("asr runner")
 

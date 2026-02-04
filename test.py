@@ -1,13 +1,13 @@
 import logging
-from src.apipe import APipe, APipeWrap
-from src.atask import ATask, ATask_Quit
-import src.model_id as mid
+from atask_run.apipe import APipe, APipeWrap
+from atask_run.atask import ATask, ATask_Quit
+import atask_run.model_id as mid
 from typing import List, cast
 import numpy as np
 import threading
 import unittest
-from src.timeused import TimeUsed, TimeUsedSum
-from src.models.asr_vad import Model_asr_vad
+from atask_run.timeused import TimeUsed, TimeUsedSum
+from atask_run.models.asr_vad import Model_asr_vad
 from do_asr import ASRRunner
 import soundfile
 
@@ -176,7 +176,7 @@ if __name__ == "__main__":
         )
 
     if args.build_model_config:
-        from src.model_desc import build_default_model_configs, load_model_config
+        from atask_run.model_desc import build_default_model_configs, load_model_config
         build_default_model_configs()
         cfgs = load_model_config(config_path="./config_temp")
         print(json.dumps(cfgs, indent=2, ensure_ascii=False))
