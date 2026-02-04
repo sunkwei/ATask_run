@@ -11,12 +11,25 @@ from src.models.asr_vad import Model_asr_vad
 from do_asr import ASRRunner
 import soundfile
 
+# 如果 windows 平台，需要使用不同的路径
+import os.path as osp
+import sys
+
+if sys.platform == 'win32':
+    TEST_FNAME0 = "p:/tmp/test_asr/726_part1.wav"
+    TEST_726 = "n:/videos/726/teacher.wav"
+    RESULT_PATH = "p:/tmp"
+else:
+    TEST_FNAME0 = "/media/pub/tmp/test_asr/726_part1.wav"
+    TEST_726 = "/media/pub/videos/726/teacher.wav"
+    RESULT_PATH = "/media/pub/tmp"
+
 logger = logging.getLogger("test")
 
 class Test(unittest.TestCase):
     def test_vad_1s(self):
         M = Model_asr_vad("./model/asr_vad/asr_vad.onnx")
-        pcm, sr = soundfile.read("/media/pub/tmp/test_asr/726_part1.wav")
+        pcm, sr = soundfile.read(TEST_FNAME0)
         pcm = pcm.astype(np.float32)
         head, tail = 0, len(pcm)
         step = 16000    # 1秒一段的调用
@@ -28,7 +41,7 @@ class Test(unittest.TestCase):
         segs.extend(M.update(None))
 
         ## 生成 audacity label 文件
-        with open(f"/media/pub/tmp/test_vad_raw_{step}.txt", "w") as f:
+        with open(osp.join(RESULT_PATH, f"test_vad_raw_{step}.txt"), "w") as f:
             for seg in segs:
                 f.write(f"{seg[0]/1000.0:.03f}\t{seg[1]/1000.0:.03f}\tv\n")
 
@@ -40,7 +53,7 @@ class Test(unittest.TestCase):
 
     def test_vad_6s(self):
         M = Model_asr_vad("./model/asr_vad/asr_vad.onnx")
-        pcm, sr = soundfile.read("/media/pub/tmp/test_asr/726_part1.wav")
+        pcm, sr = soundfile.read(TEST_FNAME0)
         pcm = pcm.astype(np.float32)
         head, tail = 0, len(pcm)
         step = 96000    # 6秒一段的调用
@@ -52,7 +65,7 @@ class Test(unittest.TestCase):
         segs.extend(M.update(None))
 
         ## 生成 audacity label 文件
-        with open(f"/media/pub/tmp/test_vad_raw_{step}.txt", "w") as f:
+        with open(osp.join(RESULT_PATH, f"test_vad_raw_{step}.txt"), "w") as f:
             for seg in segs:
                 f.write(f"{seg[0]/1000.0:.03f}\t{seg[1]/1000.0:.03f}\tv\n")
 
@@ -64,7 +77,7 @@ class Test(unittest.TestCase):
 
     def test_vad_for_asr(self):
         M = Model_asr_vad("./model/asr_vad/asr_vad.onnx")
-        pcm, sr = soundfile.read("/media/pub/tmp/test_asr/726_part1.wav")
+        pcm, sr = soundfile.read(TEST_FNAME0)
         pcm = pcm.astype(np.float32)
         head, tail = 0, len(pcm)
         step = 96000    # 6秒一段的调用
@@ -79,7 +92,7 @@ class Test(unittest.TestCase):
         if begin_ms >= 0:
             segs.append([begin_ms, end_ms])
 
-        with open(f"/media/pub/tmp/test_vad_for_asr.txt", "w") as f:
+        with open(osp.join(RESULT_PATH, f"test_vad_for_asr.txt"), "w") as f:
             for seg in segs:
                 f.write(f"{seg[0]/1000.0:.03f}\t{seg[1]/1000.0:.03f}\tv\n")
 
@@ -99,7 +112,7 @@ class Test(unittest.TestCase):
         
         :param self: Description
         '''
-        wav_fname = "/media/nas/videos/726/teacher.wav"
+        wav_fname = TEST_726
         with APipeWrap(model_mask=mid.DO_ASR_ENCODE | mid.DO_ASR_PREDICTOR | mid.DO_ASR_DECODE | mid.DO_ASR_STAMP) as pipe:
             sess = ASRRunner(pipe)
             pcm, sr = soundfile.read(wav_fname, dtype="float32", frames=-1)
@@ -107,7 +120,7 @@ class Test(unittest.TestCase):
                 asr_result = sess.update_stream(pcm, last=True)
 
         ## 存储为 audacity 标签文件
-        with open("/media/pub/tmp/test_asr_726_stream.txt", "w") as f:
+        with open(osp.join(RESULT_PATH, "test_asr_726_stream.txt"), "w") as f:
             for r in asr_result:
                 begin_ms = r["begin_ms"]
                 end_ms = r["end_ms"]
@@ -122,7 +135,7 @@ class Test(unittest.TestCase):
             模拟文件模式
 
         '''
-        wav_fname = "/media/nas/videos/726/teacher.wav"
+        wav_fname = TEST_726
         with APipeWrap(model_mask=mid.DO_ASR_ENCODE | mid.DO_ASR_PREDICTOR | mid.DO_ASR_DECODE | mid.DO_ASR_STAMP) as pipe:
             sess = ASRRunner(pipe)
             pcm, sr = soundfile.read(wav_fname, dtype="float32", frames=-1)
@@ -130,7 +143,7 @@ class Test(unittest.TestCase):
                 asr_result = sess.update_file(pcm)
 
         ## 存储为 audacity 标签文件
-        with open("/media/pub/tmp/test_asr_726_file.txt", "w") as f:
+        with open(osp.join(RESULT_PATH, "test_asr_726_file.txt"), "w") as f:
             for r in asr_result:
                 begin_ms = r["begin_ms"]
                 end_ms = r["end_ms"]
