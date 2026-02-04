@@ -21,7 +21,7 @@ if sys.platform == 'win32':
     RESULT_PATH = "p:/tmp"
 else:
     TEST_FNAME0 = "/media/pub/tmp/test_asr/726_part1.wav"
-    TEST_726 = "/media/pub/videos/726/teacher.wav"
+    TEST_726 = "/media/nas/videos/726/teacher.wav"
     RESULT_PATH = "/media/pub/tmp"
 
 logger = logging.getLogger("test")
