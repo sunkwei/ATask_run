@@ -40,19 +40,24 @@ class Model_asr_vad:
         '''
         return self.__segs
     
-    def update(self, pcm:np.ndarray | None) -> list:
+    def update(self, pcm:np.ndarray | None, last:bool=False) -> list:
         '''
             不断输入 pcm 数据，若 pcm 为 None，则表示结束
             返回一个 List[Tuple]，其中每个 Tuple 包含 (start_ms, end_ms)
         '''
-        segs = self.__impl.update(last=True) if pcm is None else self.__impl.update(pcm)
+        if not last:
+            segs = self.__impl.update(pcm)
+        else:
+            segs = self.__impl.update(pcm, last=last)
+
         self.__segs.extend(segs)
         return segs
         
     def update_for_asr(
         self, pcm:np.ndarray | None, 
         max_duration_ms:int=15000, 
-        max_merge_interval_ms:int=1200
+        max_merge_interval_ms:int=1200,
+        last:bool=False
     ) -> Tuple[int, int]:
         '''
             将返回适合 asr 的 vad 片段。
@@ -62,7 +67,7 @@ class Model_asr_vad:
 
             原始 vad 每个片段都小于等于 8 秒
         '''
-        self.update(pcm)
+        self.update(pcm, last)
         if self.__asr_next_index >= len(self.__segs):
             return (-1, -1)
         

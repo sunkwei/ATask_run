@@ -15,8 +15,9 @@ class ASRRunner:
         self.__cached_pcm = np.empty((0, ), np.float32)
         self.__stamp_ms_cached_pcm = 0
         self.__sample_once_vad = 6 * 16000
+        self.thr_db_thresh = 0.003
         self.__V = Model_asr_vad("./model/asr_vad/asr_vad.onnx")
-        self.__mod_mask = mid.DO_ASR_ENCODE | mid.DO_ASR_PREDICTOR | mid.DO_ASR_DECODE | mid.DO_ASR_STAMP
+        self.__mod_mask = mid.DO_ASR_ENCODE | mid.DO_ASR_PREDICTOR | mid.DO_ASR_DECODE | mid.DO_ASR_STAMP | mid.DO_SENSEVOICE
         if isinstance(pipe, APipe):
             self.__P = cast(APipe, pipe)
             self.__owner = False
@@ -117,6 +118,17 @@ class ASRRunner:
                     break
             return None
 
+        def cal_mean_audio(audio):
+            if len(audio) > 100:
+                audio_up = audio[audio>0]
+                sort_d = np.sort(audio_up)
+                keep = sort_d[-int(len(sort_d) * 0.1):]
+                if len(keep) == 0:
+                    return 0.0001
+                return float(round(np.mean(keep),5)) + 0.0001
+            else:
+                return 0.0001
+        
         th = threading.Thread(target=wait_proc, args=(self.__P, results))
         th.start()
 
@@ -125,27 +137,30 @@ class ASRRunner:
         while head + self.__sample_once_vad <= tail:
             begin_ms, end_ms = self.__V.update_for_asr(pcm[head : head + self.__sample_once_vad])
             if begin_ms >= 0:
-                if begin_ms < end_ms:
-                    vad_segs.append((begin_ms, end_ms))
+                begin_stamp = 16 * begin_ms; end_stamp = 16 * end_ms
+                pcm_seg = pcm[begin_stamp:end_stamp]
+
+                if cal_mean_audio(pcm_seg) < self.thr_db_thresh:
+                    continue
+
+                vad_segs.append((begin_ms, end_ms))
             head += self.__sample_once_vad
 
         if head < tail:
-            pcm_last = np.concatenate(
-                [pcm[head:], np.zeros((self.__sample_once_vad - tail + head, ), dtype=np.float32)]
-            )
-            begin_ms, end_ms = self.__V.update_for_asr(pcm_last)
-            if begin_ms >= 0 and begin_ms < end_ms:
-                vad_segs.append((begin_ms, end_ms))
-        
-        begin_ms, end_ms = self.__V.update_for_asr(None)
-        if begin_ms >= 0 and begin_ms < end_ms:
-            vad_segs.append((begin_ms, end_ms))
+            begin_ms, end_ms = self.__V.update_for_asr(pcm[head:], last=True)
+            if begin_ms >= 0:
+                begin_stamp = 16 * begin_ms; end_stamp = 16 * end_ms
+                pcm_seg = pcm[begin_stamp:end_stamp]
 
+                if cal_mean_audio(pcm_seg) >= self.thr_db_thresh:
+                    vad_segs.append((begin_ms, end_ms))
+        
         logger.debug(f"{self.__class__.__name__}: update_file: GOT {len(vad_segs)} segs, vad_segs={vad_segs}")
         
         for begin_ms, end_ms in vad_segs:
             begin_stamp = 16 * begin_ms; end_stamp = 16 * end_ms
             pcm_seg = pcm[begin_stamp:end_stamp]
+
             task = ATask(
                 self.__mod_mask, 
                 pcm_seg, 

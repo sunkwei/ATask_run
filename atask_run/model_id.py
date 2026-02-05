@@ -34,6 +34,7 @@ DO_PHONE_DET = 0x40000000
 
 DO_ASR_PREDICTOR = 0x80000000
 DO_ASR_STAMP = 0x100000000
+DO_SENSEVOICE = 0x200000000
 
 def todo2str(todo:int) -> str:
     if todo == 0:
