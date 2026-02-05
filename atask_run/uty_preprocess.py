@@ -1,11 +1,12 @@
 import numpy as np
 import cv2
+from typing import Tuple
 
 def prepare_image(
     img0: np.ndarray, 
     target_size: tuple = (960, 544), 
     keep_aspect: bool = True
-) -> np.ndarray:
+) -> Tuple[np.ndarray, float, float]:
     """
     预处理图像，缩放到目标尺寸，可选择保持宽高比
     
@@ -15,7 +16,7 @@ def prepare_image(
         keep_aspect: 是否保持原始宽高比
         
     Returns:
-        处理后的BGR图像 (target_height, target_width, C)
+        处理后的BGR图像 (target_height, target_width, C), 水平缩放, 垂直缩放
     """
     # 参数检查
     if not isinstance(img0, np.ndarray) or len(img0.shape) != 3:
@@ -28,7 +29,11 @@ def prepare_image(
     
     # 不保持宽高比的情况下直接缩放
     if not keep_aspect:
-        return cv2.resize(img0, (target_width, target_height))
+        return (
+            cv2.resize(img0, (target_width, target_height)), 
+            img0.shape[1] / target_width, 
+            img0.shape[0] / target_height
+        )
     
     # 保持宽高比的缩放
     h, w = img0.shape[:2]
@@ -51,4 +56,4 @@ def prepare_image(
     # 将缩放后的图像放入目标图像右下角
     result[y_offset:y_offset+new_h, x_offset:x_offset+new_w] = resized_img
     
-    return result
+    return (result, 1/scale, 1/scale)

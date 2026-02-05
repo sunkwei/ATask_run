@@ -111,6 +111,12 @@ class AModel:
     def model_path(self) -> str:
         return self.__model_path
     
+    def get_input_count(self) -> int:
+        return self.__backend_impls[0].get_input_num()
+    
+    def get_input_shape(self, i:int) -> tuple[int, ...]:
+        return self.__backend_impls[0].get_input_shape(i)
+    
     def _preprocess(self, task:ATask):
         pass
 
