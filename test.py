@@ -104,7 +104,7 @@ class Test(unittest.TestCase):
         self.assertEqual(segs[2], [17480, 20190])
         self.assertEqual(segs[3], [21510, 32070])
 
-    def _test_726_asr_stream(self):
+    def test_726_asr_stream(self):
         """
         模拟流式ASR处理流程，包括读取音频数据、进行VAD分割和ASR识别。
 
@@ -121,11 +121,19 @@ class Test(unittest.TestCase):
             None: 结果将保存到RESULT_PATH/test_asr_726_stream.txt文件中
         """
         wav_fname = TEST_726
-        with APipeWrap(model_mask=mid.DO_ASR_ENCODE | mid.DO_ASR_PREDICTOR | mid.DO_ASR_DECODE | mid.DO_ASR_STAMP) as pipe:
-            sess = ASRRunner(pipe)
+        with APipeWrap(
+            model_mask=mid.DO_ASR_ENCODE | mid.DO_ASR_PREDICTOR | mid.DO_ASR_DECODE | mid.DO_ASR_STAMP
+        ) as pipe:
+            sess = ASRRunner(pipe, debug=True)
             pcm, sr = soundfile.read(wav_fname, dtype="float32", frames=-1)
+            asr_result = []
             with TimeUsed(f"asr_update_stream duration:{len(pcm)/16000:.03f} seconds"):
-                asr_result = sess.update_stream(pcm, last=True)
+                head = 0; tail = len(pcm)
+                while head < tail:
+                    N = min(16000, tail - head)
+                    asr_result.extend(sess.update_stream(pcm[head : head + N]))
+                    head += N
+                asr_result.extend(sess.update_stream(pcm[head:], last=True))
 
         ## 存储为 audacity 标签文件
         with open(osp.join(RESULT_PATH, "test_asr_726_stream.txt"), "w") as f:

@@ -16,6 +16,7 @@ class ASRRunner:
         self.__cached_pcm = np.empty((0, ), np.float32)
         self.__stamp_ms_cached_pcm = 0
         self.__sample_once_vad = 6 * 16000
+        self.__cached_pcm_next_vad = 0  ## 保留下一段需要提交给 vad 的位置，相对 self.__cached_pcm 偏移
         self.__V = Model_asr_vad("./model/asr_vad/asr_vad.onnx")
         self.__mod_mask = mid.DO_ASR_ENCODE | mid.DO_ASR_PREDICTOR | mid.DO_ASR_DECODE | mid.DO_ASR_STAMP
         if isinstance(pipe, APipe):
@@ -39,21 +40,18 @@ class ASRRunner:
             循环，每次 vad 得到一条片段，执行 asr 得到结果，再 vad ...
         '''
         if self.debug:
-            logger.info(f"{self.__class__.__name__}: update_stream: pcm.shape={pcm.shape}, last={last}")
+            logger.debug(f"{self.__class__.__name__}: update_stream: pcm.shape={pcm.shape}, last={last}, cached_pcm={self.__cached_pcm.shape[0]}, cached_begin_stamp:{self.__stamp_ms_cached_pcm}")
 
         self.__cached_pcm = np.concatenate([self.__cached_pcm, pcm])
-        head, tail = 0, len(self.__cached_pcm)
+        head, tail = self.__cached_pcm_next_vad, len(self.__cached_pcm)
         asr_result = []
         last_stamp = self.__stamp_ms_cached_pcm
         while head + self.__sample_once_vad <= tail:
             begin_ms, end_ms = self.__V.update_for_asr(self.__cached_pcm[head : head + self.__sample_once_vad])
+            self.__cached_pcm_next_vad += self.__sample_once_vad    ## 下次提交 vad 的位置
             if begin_ms >= 0:
-                if begin_ms < end_ms:
-                    rs = self.__do_asr(begin_ms, end_ms)
-                    asr_result.append(rs)
-                    if self.debug:
-                        txt = ''.join(rs['tokens'])
-                        logger.info(f"    GOT vad seg: {begin_ms}-{end_ms}, txt:{txt}, pcm:{rs['pcm']}")
+                rs = self.__do_asr(begin_ms, end_ms)
+                asr_result.append(rs)
                 last_stamp = end_ms
             head += self.__sample_once_vad
 
@@ -65,27 +63,25 @@ class ASRRunner:
                 if begin_ms >= 0 and begin_ms < end_ms:
                     rs = self.__do_asr(begin_ms, end_ms)
                     asr_result.append(rs)
-                    if self.debug:
-                        txt = ''.join(rs['tokens'])
-                        logger.info(f"    GOT vad seg: {begin_ms}-{end_ms}, txt:{txt}")
 
             begin_ms, end_ms = self.__V.update_for_asr(None)
             if begin_ms >= 0 and begin_ms < end_ms:
                 rs = self.__do_asr(begin_ms, end_ms)
                 asr_result.append(rs)
-                if self.debug:
-                    txt = ''.join(rs['tokens'])
-                    logger.info(f"    GOT vad seg: {begin_ms}-{end_ms}, txt:{txt}")
 
             ## 所有清空
             self.__V.reset()
             self.__cached_pcm = np.empty((0, ), np.float32)
             self.__stamp_ms_cached_pcm = 0
+            self.__cached_pcm_next_vad = 0
         else:
             ## 删除不再需要的 pcm
-            used_samples = 16 * (last_stamp - self.__stamp_ms_cached_pcm)
-            self.__cached_pcm = self.__cached_pcm[used_samples:]
-            self.__stamp_ms_cached_pcm = last_stamp
+            if last_stamp > self.__stamp_ms_cached_pcm:
+                used_samples = 16 * (last_stamp - self.__stamp_ms_cached_pcm)
+                self.__cached_pcm = self.__cached_pcm[used_samples:]
+                self.__stamp_ms_cached_pcm = last_stamp
+                ## 更新 vad 相对位置
+                self.__cached_pcm_next_vad -= used_samples
 
         return asr_result
     
@@ -253,9 +249,13 @@ class ASRRunner:
         return results
     
     def __do_asr(self, begin_ms, end_ms, pcm=None) -> dict:
+        logger.debug("__do_asr: begin_ms:{}, end_ms:{}, cache_samples from {} to {}".format(
+            begin_ms, end_ms, self.__stamp_ms_cached_pcm, len(self.__cached_pcm) / 16 + self.__stamp_ms_cached_pcm
+        ))
         if pcm is None:
             begin_samples = 16 * (begin_ms - self.__stamp_ms_cached_pcm)
             end_samples = 16 * (end_ms - self.__stamp_ms_cached_pcm)
+            assert end_samples <= len(self.__cached_pcm)
             pcm = self.__cached_pcm[begin_samples:end_samples]
         task = ATask(self.__mod_mask, pcm, userdata={})
         self.__P.post_task(task)
@@ -263,10 +263,8 @@ class ASRRunner:
         rs = {
             "begin_ms": begin_ms,
             "end_ms": end_ms,
-            "tokens": task.data["asr_dec_token"],
-            "stamps": [(s[0] + begin_ms, s[1] + begin_ms) for s in task.data["asr_dec_stamp"]]
+            "tokens": task.data["asr_dec_token"][0],
+            "stamps": [(s[0] + begin_ms, s[1] + begin_ms) for s in task.data["asr_dec_stamp"][0]]
         }
 
-        if self.debug:
-            rs["pcm"] = task.inpdata
         return rs
