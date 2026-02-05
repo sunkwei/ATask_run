@@ -50,10 +50,8 @@ class APipe:
         model_mask: int=-1,         ## 启用的模型 bitmask，默认启用所有
         model_config_path: str="./config",
         debug: bool=False,
-        debug_one_thread: bool=False, ## 如果启动单线程，则顺序执行
     ):
         self.debug = debug
-        self.debug_one_thread = debug_one_thread
 
         Q_inp_sub_size = Q_infer_size = Q_result_size = -1
         Q_pre_size = Q_inp_size * 5
@@ -83,7 +81,17 @@ class APipe:
         if E_post_num_thread <= 0:
             E_post_num_thread = 2
 
-        logger.info(f"APipe: cfg: Q_inp_size:{Q_inp_size}, E_pre_num_thread:{E_pre_num_thread}, E_infer_num_thread:{E_infer_num_thread}, E_post_num_thread:{E_post_num_thread}")
+        if debug:
+            Q_inp_size = 1
+            Q_pre_size = 1
+            Q_infer_size = 1
+            Q_result_size = 1
+
+            E_infer_num_thread = 1
+            E_post_num_thread = 1
+            E_pre_num_thread = 1
+
+        logger.info(f"APipe: debug:{debug} cfg: Q_inp_size:{Q_inp_size}, E_pre_num_thread:{E_pre_num_thread}, E_infer_num_thread:{E_infer_num_thread}, E_post_num_thread:{E_post_num_thread}")
 
         self.__supported_todo = 0
         self.__model_desc = load_model_config(model_config_path, model_mask)
@@ -109,17 +117,20 @@ class APipe:
             self.Q_inp, self.Q_pre, 
             E_pre_num_thread,
             sub_q = self.Q_inp_sub,
+            debug=self.debug,
         )
         self.E_infer = AExecutor(
             "infer", find_model, 
             self.Q_pre, self.Q_infer, 
-            E_infer_num_thread
+            E_infer_num_thread,
+            debug=self.debug,
         )
         self.E_post = AExecutor(
             "post", find_model, 
             self.Q_infer, self.Q_inp_sub, 
             E_post_num_thread, 
-            result_q=self.Q_result
+            result_q=self.Q_result,
+            debug=self.debug,
         )
 
         ## 根据配置的模型，加载所有模型
@@ -189,6 +200,9 @@ class APipe:
             if mid == DO_ASR_VAD:
                 logger.warning(f"load_models: ignore DO_ASR_VAD")
                 continue
+
+            if self.debug:
+                cfg["debug"] = True
             
             ## 从 f"models/{name}.py" 中 import f"Model_name" 类，并实例化
             # logger.info(f"APipe: load_models: load {name} from ./models.{name}")
@@ -202,11 +216,12 @@ class APipe:
 
 
 class APipeWrap:
-    def __init__(self, model_mask: int=-1):
+    def __init__(self, model_mask: int=-1, debug:bool=False):
         self.__model_mask = model_mask
+        self.__debug = debug
 
     def __enter__(self):
-        self.__pipe = APipe(model_mask=self.__model_mask)
+        self.__pipe = APipe(model_mask=self.__model_mask, debug=self.__debug)
         return self.__pipe
 
     def __exit__(self, exc_type, exc_value, traceback):

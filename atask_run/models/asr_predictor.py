@@ -7,8 +7,9 @@ import numpy as np
 class Model_asr_predictor(AModel):
     def _preprocess(self, task: ATask):
         assert "asr_enc_infer" in task.data, f"'asr_enc_infer' not found in task.data, {task.data.keys()}"
+        assert "asr_enc_mask" in task.data, f"'asr_enc_mask' not found in task.data, {task.data.keys()}"
         enc_out = task.data["asr_enc_infer"][0]
-        enc_mask = np.ones((1, 1, enc_out.shape[1]), dtype=np.float32)
+        enc_mask = task.data["asr_enc_mask"]
         task.data["asr_predictor_inp"] = (enc_out, enc_mask)
     
     def _infer(self, task: ATask):
@@ -16,4 +17,4 @@ class Model_asr_predictor(AModel):
         task.data["asr_predictor_infer"] = self(task.data["asr_predictor_inp"])
     
     def _postprocess(self, task: ATask):
-        assert len(task.data["asr_predictor_infer"]) == 4
+        assert len(task.data["asr_predictor_infer"]) == 4 # (pre_acoustic_embeds, pre_token_length, alpha, pre_peak_index)

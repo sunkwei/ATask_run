@@ -10,7 +10,8 @@ from atask_run.atask import ATask
 logger = logging.getLogger("asr runner")
 
 class ASRRunner:
-    def __init__(self, pipe=None, debug=False):
+    def __init__(self, pipe=None, batch_size:int=1, debug=False):
+        self.batch_size = batch_size
         self.debug = debug
         self.__cached_pcm = np.empty((0, ), np.float32)
         self.__stamp_ms_cached_pcm = 0
@@ -97,22 +98,47 @@ class ASRRunner:
             f"{self.__class__.__name__}: update_file: pcm.shape={pcm.shape}, "
             f"duration:{len(pcm)/16000:.03f} seconds"
         )
+        batch_size = self.batch_size
         results = []
 
         def wait_proc(pipe:APipe, rs:list):
             while 1:
                 task = pipe.wait()
-                r = {
-                    "begin_ms": task.userdata["begin_ms"],
-                    "end_ms": task.userdata["end_ms"],
-                    "tokens": task.data["asr_dec_token"],
-                    "stamps": task.data["asr_dec_stamp"]
-                }
+                if not task.userdata.get("batch", False):
+                    r = {
+                        "begin_ms": task.userdata["begin_ms"],
+                        "end_ms": task.userdata["end_ms"],
+                        "tokens": task.data["asr_dec_token"][0],
+                        "stamps": task.data["asr_dec_stamp"][0],
+                    }
 
-                if self.debug:
-                    r["pcm"] = task.inpdata
+                    if self.debug:
+                        asr_predictor_infer = task.data["asr_predictor_infer"] #
+                        pre_token_length = asr_predictor_infer[1][0]
+                        r.update({
+                            "asr pre_token_length": pre_token_length,
+                        })
 
-                rs.append(r)
+                    rs.append(r)
+                else:
+                    ## 批次模式：
+                    for i in range(len(task.userdata["batch_seg_ms"])):
+                        r = {
+                            "begin_ms": task.userdata["batch_seg_ms"][i][0],
+                            "end_ms": task.userdata["batch_seg_ms"][i][1],
+                            "tokens": task.data["asr_dec_token"][i],
+                            "stamps": task.data["asr_dec_stamp"][i],
+                        }
+
+                        if self.debug:
+                            asr_predictor_infer = task.data["asr_predictor_infer"] #
+                            pre_token_length = asr_predictor_infer[1][i]
+                            r.update({
+                                "asr pre_token_length": pre_token_length,
+                            })
+
+                        rs.append(r)
+
                 if len(rs) == task.userdata["total"]:
                     break
             return None
@@ -142,21 +168,82 @@ class ASRRunner:
             vad_segs.append((begin_ms, end_ms))
 
         logger.debug(f"{self.__class__.__name__}: update_file: GOT {len(vad_segs)} segs, vad_segs={vad_segs}")
+
+        if batch_size == 1:
+            for i, (begin_ms, end_ms) in enumerate(vad_segs):
+                begin_sample = 16 * begin_ms; end_sample = 16 * end_ms
+                pcm_seg = pcm[begin_sample:end_sample]
+                task = ATask(
+                    self.__mod_mask,
+                    pcm_seg,
+                    userdata={"begin_ms": begin_ms, "end_ms": end_ms, "total": len(vad_segs)}
+                )
+                self.__P.post_task(task)
+        else:
+            ## XXX: 对 vad 片段根据长度进行排序，采用“桶”模式构造“批次数据”的 ATask
+            ## 因为 asr vad 片段为 (0, 15秒)，所以可以构造 15 个桶，分别存储 (0, 1], (1, 2], ... (14, 15) 的片段
+            buckets = [[] for _ in range(15)]   ## 每个桶存储 vad 片段序号
+            for i, (begin_ms, end_ms) in enumerate(vad_segs):
+                bucket_idx = (end_ms - begin_ms) // 1000
+                buckets[bucket_idx].append(i)
+
+            buckets = buckets[::-1]     ## 反序，防止慢慢增大
         
-        for begin_ms, end_ms in vad_segs:
-            begin_stamp = 16 * begin_ms; end_stamp = 16 * end_ms
-            pcm_seg = pcm[begin_stamp:end_stamp]
-            task = ATask(
-                self.__mod_mask, 
-                pcm_seg, 
-                userdata={"begin_ms": begin_ms, "end_ms": end_ms, "total": len(vad_segs)}
-            )
-            self.__P.post_task(task)
-            
+            def next_batch(bucket: list, batch_size: int):
+                # 确保是2的幂
+                assert batch_size > 0 and (batch_size & (batch_size - 1)) == 0  
+                while bucket:
+                    if len(bucket) >= batch_size:
+                        yield bucket[:batch_size]
+                        bucket = bucket[batch_size:]
+                    else:
+                        if batch_size == 1:
+                            yield bucket
+                            break
+                        else:
+                            # 减半batch_size继续尝试
+                            batch_size //= 2
+
+            for i, bucket in enumerate(buckets):
+                for batch in next_batch(bucket, 16):
+                    if not bucket:
+                        continue
+
+                    ## 根据时长，补齐 batch
+                    batch_pcm = []
+                    batch_samples = []
+                    batch_seg_ms = []
+                    for idx in batch:
+                        begin_ms, end_ms = vad_segs[idx]
+                        batch_seg_ms.append((begin_ms, end_ms))
+                        begin_sample = 16 * begin_ms; end_sample = 16 * end_ms
+                        pcm_seg = pcm[begin_sample:end_sample]
+                        batch_pcm.append(pcm_seg)
+                        batch_samples.append(end_sample - begin_sample)
+
+                    task = ATask(
+                        self.__mod_mask,
+                        (batch_pcm, batch_samples),
+                        userdata={
+                            "batch": True,
+                            "total": len(vad_segs),
+                            "batch_seg_ms": batch_seg_ms,
+                        }
+                    )
+                    self.__P.post_task(task)
+
         th.join()
 
         ## XXX: results 必须重新排序
         results.sort(key=lambda x: x["begin_ms"])
+
+        if self.debug:
+            fname = f"batch_{batch_size}_debug.txt"
+            with open(fname, "w") as f:
+                for r in results:
+                    text = ''.join(r['tokens'])
+                    f.write(f"{r['begin_ms']}\t{r['end_ms']}, pre_token_len:{r['asr pre_token_length']}, txt: {text}'\n")
+            logger.warning(f"{fname} saved!!!!")
 
         if self.debug:
             for rs in results:
@@ -164,7 +251,7 @@ class ASRRunner:
                 logger.info(f"    GOT vad seg: {rs['begin_ms']}-{rs['end_ms']}, txt:{txt}, pcm:{rs['pcm']}")
 
         return results
-
+    
     def __do_asr(self, begin_ms, end_ms, pcm=None) -> dict:
         if pcm is None:
             begin_samples = 16 * (begin_ms - self.__stamp_ms_cached_pcm)

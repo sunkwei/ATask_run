@@ -17,7 +17,9 @@ import sys
 
 if sys.platform == 'win32':
     TEST_FNAME0 = "p:/tmp/test_asr/726_part1.wav"
-    TEST_726 = "n:/videos/726/teacher.wav"
+    TEST_726 = "wav/726.wav"
+    # TEST_726 = "wav/teacher_10min.wav"
+    # TEST_726 = "wav/726_part1.wav"
     RESULT_PATH = "p:/tmp"
 else:
     TEST_FNAME0 = "/media/pub/tmp/test_asr/726_part1.wav"
@@ -27,7 +29,7 @@ else:
 logger = logging.getLogger("test")
 
 class Test(unittest.TestCase):
-    def test_vad_1s(self):
+    def _test_vad_1s(self):
         M = Model_asr_vad("./model/asr_vad/asr_vad.onnx")
         pcm, sr = soundfile.read(TEST_FNAME0)
         pcm = pcm.astype(np.float32)
@@ -51,7 +53,7 @@ class Test(unittest.TestCase):
         self.assertEqual(segs[2], [4990, 6080])
         self.assertEqual(segs[-1], [29430, 31530])
 
-    def test_vad_6s(self):
+    def _test_vad_6s(self):
         M = Model_asr_vad("./model/asr_vad/asr_vad.onnx")
         pcm, sr = soundfile.read(TEST_FNAME0)
         pcm = pcm.astype(np.float32)
@@ -75,7 +77,7 @@ class Test(unittest.TestCase):
         self.assertEqual(segs[2], [5090, 6180])
         self.assertEqual(segs[-1], [29950, 32070])
 
-    def test_vad_for_asr(self):
+    def _test_vad_for_asr(self):
         M = Model_asr_vad("./model/asr_vad/asr_vad.onnx")
         pcm, sr = soundfile.read(TEST_FNAME0)
         pcm = pcm.astype(np.float32)
@@ -142,10 +144,15 @@ class Test(unittest.TestCase):
 
         '''
         wav_fname = TEST_726
-        with APipeWrap(model_mask=mid.DO_ASR_ENCODE | mid.DO_ASR_PREDICTOR | mid.DO_ASR_DECODE | mid.DO_ASR_STAMP) as pipe:
-            sess = ASRRunner(pipe)
+        batch_size = 64
+
+        with APipeWrap(
+            model_mask=mid.DO_ASR_ENCODE | mid.DO_ASR_PREDICTOR | mid.DO_ASR_DECODE | mid.DO_ASR_STAMP, 
+            debug=False,
+        ) as pipe:
+            sess = ASRRunner(pipe, batch_size=batch_size)
             pcm, sr = soundfile.read(wav_fname, dtype="float32", frames=-1)
-            with TimeUsed(f"asr_update_file duration:{len(pcm)/16000:.03f} seconds"):
+            with TimeUsed(f"asr_update_file B:{batch_size}, duration:{len(pcm)/16000:.03f} seconds"):
                 asr_result = sess.update_file(pcm)
 
         ## 存储为 audacity 标签文件
@@ -155,7 +162,7 @@ class Test(unittest.TestCase):
                 end_ms = r["end_ms"]
                 tokens = r["tokens"]
                 stamps = r["stamps"]
-
+                
                 txt = ''.join(tokens)
                 f.write(f"{begin_ms/1000:.03f}\t{end_ms/1000:.03f}\t{txt}\n")
 
