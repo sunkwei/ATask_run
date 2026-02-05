@@ -199,4 +199,15 @@ def build_default_model_configs(
         [mid.DO_ASR_ENCODE, mid.DO_ASR_PREDICTOR, mid.DO_ASR_DECODE],
     )
 
+    save(
+        "asr_sensevoice",
+        mid.DO_SENSEVOICE,
+        [
+            {"name":"speech","dtype":"float","shape":[1,-1,560]},
+            {"name":"speech_lengths","dtype":"int32","shape":[1]},
+            {"name":"language","dtype":"int32","shape":[1]},
+            {"name":"textnorm","dtype":"int32","shape":[1]},
+        ],
+        [mid.DO_ASR_ENCODE, mid.DO_ASR_PREDICTOR, mid.DO_ASR_DECODE, mid.DO_ASR_STAMP],
+    )
     return None

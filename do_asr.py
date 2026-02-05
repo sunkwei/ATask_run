@@ -16,9 +16,10 @@ class ASRRunner:
         self.__cached_pcm = np.empty((0, ), np.float32)
         self.__stamp_ms_cached_pcm = 0
         self.__sample_once_vad = 6 * 16000
+        self.thr_db_thresh = 0.003
         self.__cached_pcm_next_vad = 0  ## 保留下一段需要提交给 vad 的位置，相对 self.__cached_pcm 偏移
         self.__V = Model_asr_vad("./model/asr_vad/asr_vad.onnx")
-        self.__mod_mask = mid.DO_ASR_ENCODE | mid.DO_ASR_PREDICTOR | mid.DO_ASR_DECODE | mid.DO_ASR_STAMP
+        self.__mod_mask = mid.DO_ASR_ENCODE | mid.DO_ASR_PREDICTOR | mid.DO_ASR_DECODE | mid.DO_ASR_STAMP | mid.DO_SENSEVOICE
         if isinstance(pipe, APipe):
             self.__P = cast(APipe, pipe)
             self.__owner = False
@@ -139,6 +140,17 @@ class ASRRunner:
                     break
             return None
 
+        def cal_mean_audio(audio):
+            if len(audio) > 100:
+                audio_up = audio[audio>0]
+                sort_d = np.sort(audio_up)
+                keep = sort_d[-int(len(sort_d) * 0.1):]
+                if len(keep) == 0:
+                    return 0.0001
+                return float(round(np.mean(keep),5)) + 0.0001
+            else:
+                return 0.0001
+        
         th = threading.Thread(target=wait_proc, args=(self.__P, results))
         th.start()
 
@@ -147,22 +159,24 @@ class ASRRunner:
         while head + self.__sample_once_vad <= tail:
             begin_ms, end_ms = self.__V.update_for_asr(pcm[head : head + self.__sample_once_vad])
             if begin_ms >= 0:
-                if begin_ms < end_ms:
-                    vad_segs.append((begin_ms, end_ms))
+                begin_stamp = 16 * begin_ms; end_stamp = 16 * end_ms
+                pcm_seg = pcm[begin_stamp:end_stamp]
+
+                if cal_mean_audio(pcm_seg) < self.thr_db_thresh:
+                    continue
+
+                vad_segs.append((begin_ms, end_ms))
             head += self.__sample_once_vad
 
         if head < tail:
-            pcm_last = np.concatenate(
-                [pcm[head:], np.zeros((self.__sample_once_vad - tail + head, ), dtype=np.float32)]
-            )
-            begin_ms, end_ms = self.__V.update_for_asr(pcm_last)
-            if begin_ms >= 0 and begin_ms < end_ms:
-                vad_segs.append((begin_ms, end_ms))
-        
-        begin_ms, end_ms = self.__V.update_for_asr(None)
-        if begin_ms >= 0 and begin_ms < end_ms:
-            vad_segs.append((begin_ms, end_ms))
+            begin_ms, end_ms = self.__V.update_for_asr(pcm[head:], last=True)
+            if begin_ms >= 0:
+                begin_stamp = 16 * begin_ms; end_stamp = 16 * end_ms
+                pcm_seg = pcm[begin_stamp:end_stamp]
 
+                if cal_mean_audio(pcm_seg) >= self.thr_db_thresh:
+                    vad_segs.append((begin_ms, end_ms))
+        
         logger.debug(f"{self.__class__.__name__}: update_file: GOT {len(vad_segs)} segs, vad_segs={vad_segs}")
 
         if batch_size == 1:
@@ -185,49 +199,17 @@ class ASRRunner:
 
             buckets = buckets[::-1]     ## 反序，防止慢慢增大
         
-            def next_batch(bucket: list, batch_size: int):
-                # 确保是2的幂
-                assert batch_size > 0 and (batch_size & (batch_size - 1)) == 0  
-                while bucket:
-                    if len(bucket) >= batch_size:
-                        yield bucket[:batch_size]
-                        bucket = bucket[batch_size:]
-                    else:
-                        if batch_size == 1:
-                            yield bucket
-                            break
-                        else:
-                            # 减半batch_size继续尝试
-                            batch_size //= 2
+        for begin_ms, end_ms in vad_segs:
+            begin_stamp = 16 * begin_ms; end_stamp = 16 * end_ms
+            pcm_seg = pcm[begin_stamp:end_stamp]
 
-            for i, bucket in enumerate(buckets):
-                for batch in next_batch(bucket, 16):
-                    if not bucket:
-                        continue
-
-                    ## 根据时长，补齐 batch
-                    batch_pcm = []
-                    batch_samples = []
-                    batch_seg_ms = []
-                    for idx in batch:
-                        begin_ms, end_ms = vad_segs[idx]
-                        batch_seg_ms.append((begin_ms, end_ms))
-                        begin_sample = 16 * begin_ms; end_sample = 16 * end_ms
-                        pcm_seg = pcm[begin_sample:end_sample]
-                        batch_pcm.append(pcm_seg)
-                        batch_samples.append(end_sample - begin_sample)
-
-                    task = ATask(
-                        self.__mod_mask,
-                        (batch_pcm, batch_samples),
-                        userdata={
-                            "batch": True,
-                            "total": len(vad_segs),
-                            "batch_seg_ms": batch_seg_ms,
-                        }
-                    )
-                    self.__P.post_task(task)
-
+            task = ATask(
+                self.__mod_mask, 
+                pcm_seg, 
+                userdata={"begin_ms": begin_ms, "end_ms": end_ms, "total": len(vad_segs)}
+            )
+            self.__P.post_task(task)
+            
         th.join()
 
         ## XXX: results 必须重新排序
