@@ -17,8 +17,9 @@ class AExecutor:
         num_thread: int=1,
         sub_q=None,     ## 当 name="pre" 时，优先从该 queue 获取
         result_q=None,  ## 当 name="post" 时需要，存储结果
-        debug_one_thread: bool=False, ## 如果启动单线程，则顺序执行
+        debug: bool=False, ## 如果启动单线程，则顺序执行
     ):
+        self.debug = debug
         if name == "post" and not isinstance(result_q, Queue):
             raise TypeError("result_q must be a Queue when name=='post'")
         
@@ -34,13 +35,9 @@ class AExecutor:
         self.out_q = out_q
         self.res_q = cast(Queue, result_q)
         self.sub_q = cast(Queue, sub_q)
-        if debug_one_thread:
-            num_thread = 1
-            self.ths = [threading.Thread(target=self.__run_debug) for i in range(num_thread)]
-        else:
-            self.ths = [
-                threading.Thread(target=self.__run, name=f"{name}_{i}") for i in range(num_thread)
-            ]
+        self.ths = [
+            threading.Thread(target=self.__run, name=f"{name}_{i}") for i in range(num_thread)
+        ]
         for th in self.ths: th.start()
 
     def close(self):
@@ -95,22 +92,3 @@ class AExecutor:
             else:
                 raise ValueError(f"unknown executor type {self.name}")
         return None
-
-    def __run_debug(self):
-        while 1:
-            task = self.inp_q.get()
-            if isinstance(task, ATask_Quit):
-                break
-
-            todo = task.curr_todo()
-            model = self.__func_find_model(task)
-            if isinstance(model, AModel):
-                model._preprocess(task)
-                model._infer(task)
-                model._postprocess(task)
-
-                if not task.done(model.mid()):
-                    self.out_q.put(task)
-                else:
-                    self.res_q.put(task)
-            

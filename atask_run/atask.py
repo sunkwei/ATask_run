@@ -14,11 +14,12 @@ from .model_id import todo2str
 logger = logging.getLogger("task")
 
 class ATask:
-    def __init__(self, todo:int, inpdata:np.ndarray, userdata:dict):
+    def __init__(self, todo:int, inpdata:np.ndarray | tuple, userdata:dict):
         self.todo = todo
-        self.inpdata = inpdata
+        self.inpdata = inpdata      ## indata 可以是单个数据，也可以是 tuple, 如 (batch_pcm, batch_samples)
         self.userdata = userdata
         self.data = dict()
+        
         ## 以下变量内部使用
         self.__finished = False
         self.__todo = todo

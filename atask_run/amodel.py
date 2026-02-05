@@ -34,6 +34,7 @@ class AModel:
         self.__name = name
         self.__mid = mid
         self.__model_path = model_path
+        self.debug = kwargs.get("debug", False)
 
         logger.info(f"AModel: init: name:{name}, mid:{mid}, model_path:{model_path}, kwargs:{kwargs}")
 
@@ -125,7 +126,8 @@ class AModel:
            返回 balance_score 中最小的 backend_impl
         '''
         idx = np.argmin(self.__balance_scores)
-        logger.debug("AModel: {}, idx:{}, balance:{}".format(self.__name, idx, self.__balance_scores))
+        if self.debug:
+            logger.debug("AModel: {}, idx:{}, balance:{}".format(self.__name, idx, self.__balance_scores))
         self.__balance_scores[idx] += self.__balance_ratios[idx]
         return idx
 
