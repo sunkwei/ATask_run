@@ -50,7 +50,9 @@ class Model_raisehandcls(AModel):
                 ## a: [x1,y1,x2,y2,score,cid]
                 if int(a[5]) in cids:
                     x1, y1, x2, y2 = a[:4].astype(np.int32)
-                    act_img = img[y1:y2, x1:x2]
+                    act_img = img[y1:y2, x1:x2, :]
+                    if act_img.size == 0:
+                        act_img = np.zeros((224, 224, 3), np.uint8)
                     act_img = cv2.resize(act_img, (224, 224))
                     inp = np.transpose(act_img, (2, 0, 1)).astype(np.float32)
                     inp = (inp - 116.28) * 0.0175

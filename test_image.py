@@ -6,8 +6,12 @@ import unittest
 from atask_run.apipe import ATask, APipe, APipeWrap
 import atask_run.model_id as mid
 import cv2
+import logging
 from atask_run.timeused import TimeUsed
 from atask_run.uty_postprocess import debug_draw_faceori_box
+import threading
+
+logger = logging.getLogger(__name__)
 
 class ImageTestCase(TestCase):
     def _test_action_B1(self):
@@ -89,7 +93,7 @@ class ImageTestCase(TestCase):
             mid.DO_FACEORI | \
             0
 
-        with APipeWrap(todo0, debug=True) as pipe:
+        with APipeWrap(todo0, debug=False) as pipe:
             task = ATask(todo=todo0, inpdata=tuple(images), userdata={})
             pipe.post_task(task)
             task = pipe.wait()
@@ -132,9 +136,69 @@ class ImageTestCase(TestCase):
                         }
                         debug_draw_faceori_box(img0, data)
 
-                    cv2.imshow("image", img0)
-                    cv2.waitKey(0)
+                    # cv2.imshow("image", img0)
+                    # cv2.waitKey(0)
 
+    def test_all_images(self):
+        from pathlib import Path
+        P = Path("picture")
+        fnames = [ str(p) for p in P.glob("*.jpg") ]
+        logger.info("there are {} pictures".format(len(fnames)))
+
+        todo0 = \
+            mid.DO_ACT | \
+            mid.DO_FACEDET | \
+            mid.DO_FACE_SCORE | \
+            mid.DO_RAISEHANDCLS | \
+            mid.DO_FACEREC | \
+            mid.DO_FACEORI | \
+            0
+        
+        with APipeWrap(todo0) as pipe:
+            def wait_proc():
+                count = 0
+                while 1:
+                    pipe.wait()
+                    count += 1
+                    if count == len(fnames):
+                        break
+            th = threading.Thread(target=wait_proc)
+            th.start()
+
+            with TimeUsed("test all image"):
+                for i in range(len(fnames)):
+                    img = cv2.imread(fnames[i])
+                    task = ATask(todo=todo0, inpdata=img, userdata={"fname": fnames[i]})
+                    pipe.post_task(task)
+
+                th.join()
+
+    def __test_images(self, batch_size=1):
+        from pathlib import Path
+        P = Path("picture")
+        fnames = [ str(p) for p in P.glob("*.jpg") ]
+        logger.info("there are {} pictures".format(len(fnames)))
+
+        todo0 = \
+            mid.DO_ACT | \
+            mid.DO_FACEDET | \
+            mid.DO_FACE_SCORE | \
+            mid.DO_RAISEHANDCLS | \
+            mid.DO_FACEREC | \
+            mid.DO_FACEORI | \
+            0
+        
+        with APipeWrap(todo0) as pipe:
+            def wait():
+                for i in range(len(fnames)):
+                    yield pipe.wait()
+
+            with TimeUsed(f"test batch size {batch_size}"):
+                for i in range(0, len(fnames), batch_size):
+                    batch = fnames[i : i + batch_size]
+                    tasks = [ ATask(todo=todo0, inpdata=cv2.imread(fname), userdata={"fname": fname}) for fname in batch ]
+                    for task in tasks:
+                        pipe.post_task(task)
 
 if __name__ == "__main__":
     unittest.main()

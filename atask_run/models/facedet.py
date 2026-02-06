@@ -8,7 +8,7 @@ from typing import Tuple
 import logging
 import cv2
 from ..uty_preprocess import prepare_image
-from ..uty_postprocess import yolo_facedet_post
+from ..uty_postprocess import yolo_facedet_post, clip_and_filter
 
 logger = logging.getLogger("facedet")
 
@@ -80,6 +80,14 @@ class Model_facedet(AModel):
             task.data["facedet_result_landmark"][b][:, ::2] *= rx
             task.data["facedet_result_landmark"][b][:, 1::2] *= ry
 
+            img0 = task.inpdata if isinstance(task.inpdata, np.ndarray) else task.inpdata[0]
+            h, w, _ = img0.shape
+            ## x1,y1,x2,y2 必须在 [0, w), [0, h) 范围，且 x1 < x2 and y1 < y2
+            task.data["facedet_result_face"][b], mask = clip_and_filter(
+                task.data["facedet_result_face"][b],
+                w, h
+            )
+            task.data["facedet_result_landmark"][b] = task.data["facedet_result_landmark"][b][mask]
 
     def _infer(self, task: ATask):
         '''

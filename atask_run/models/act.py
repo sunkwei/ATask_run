@@ -8,7 +8,7 @@ from typing import Tuple
 import logging
 import cv2
 from ..uty_preprocess import prepare_image
-from ..uty_postprocess import yolo_act_post
+from ..uty_postprocess import yolo_act_post, clip_and_filter
 
 logger = logging.getLogger("act")
 
@@ -86,4 +86,11 @@ class Model_act(AModel):
             task.data["act_result"][b][:, 1] -= H / 2
             task.data["act_result"][b][:, 2] = task.data["act_result"][b][:, 0] + W
             task.data["act_result"][b][:, 3] = task.data["act_result"][b][:, 1] + H
+
+            img0 = task.inpdata if isinstance(task.inpdata, np.ndarray) else task.inpdata[0]
+            h, w, _ = img0.shape
+            task.data["act_result"][b], _ = clip_and_filter(
+                task.data["act_result"][b],
+                w, h
+            )
            

@@ -120,6 +120,16 @@ def yolo_facedet_post(infer_out: np.ndarray, conf_thresh=0.4, iou_thresh=0.45) -
 
     return result_face, result_landmark
 
+def clip_and_filter(boxes:np.ndarray, width:int, height:int) -> Tuple[np.ndarray, np.ndarray]:
+    # clip 坐标
+    boxes[:, [0, 2]] = np.clip(boxes[:, [0, 2]], 0, width - 1)
+    boxes[:, [1, 3]] = np.clip(boxes[:, [1, 3]], 0, height - 1)
+
+    # 过滤掉 x1 >= x2 或 y1 >= y2 的行
+    valid_mask = (boxes[:, 0] < boxes[:, 2]) & (boxes[:, 1] < boxes[:, 3])
+    boxes = boxes[valid_mask]
+    return boxes, valid_mask
+
 def debug_draw_faceori_box(image, data):
     # 要绘制朝向矩形，需要首先将 faceori_mask 对应的人脸移动到图像中心，才能使用 t_vec!!!
     cm = data['faceori_camera_matrix']

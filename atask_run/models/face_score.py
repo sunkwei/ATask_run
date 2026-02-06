@@ -42,7 +42,9 @@ class Model_face_score(AModel):
 
             for fid, face in enumerate(faces):
                 x1, y1, x2, y2 = face[:4].astype(np.int32)
-                face_img = img[y1:y2, x1:x2]
+                face_img = img[y1:y2, x1:x2, :]
+                if face_img.size == 0:
+                    face_img = np.zeros((112, 112, 3), np.uint8)
                 face_img = cv2.cvtColor(face_img, cv2.COLOR_BGR2RGB)
                 face_img = cv2.resize(face_img, (112, 112))
                 face_score_inp[face_no, ...] = np.transpose(face_img, (2, 0, 1)).astype(np.float32).reshape(3, 112, 112)
