@@ -80,7 +80,7 @@ class ImageTestCase(TestCase):
 
         images = [ cv2.imread(fname) for fname in fnames ]
         
-        todo0 = mid.DO_FACEDET | mid.DO_FACE_SCORE
+        todo0 = mid.DO_ACT | mid.DO_FACEDET | mid.DO_FACE_SCORE | mid.DO_RAISEHANDCLS
 
         with APipeWrap(todo0) as pipe:
             task = ATask(todo=todo0, inpdata=tuple(images), userdata={})

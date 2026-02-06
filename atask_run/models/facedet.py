@@ -31,6 +31,7 @@ class Model_facedet(AModel):
 
         if "act_inp" in task.data:
             task.data["facedet_inp"] = task.data["act_inp"]
+            task.data["facedet_rx_ry"] = task.data["act_rx_ry"]
         else:
             inp_shape = self.get_input_shape(0)         # (B, C, H, W)
             want_size = (inp_shape[3], inp_shape[2])    # 图像预处理大小
@@ -84,4 +85,8 @@ class Model_facedet(AModel):
         '''
             推理，输入 facedet_inp: np.ndarray，输出 facedet_infer: np.ndarray
         '''
-        task.data["facedet_infer"] = self._hlp_batch_infer(16, task.data["facedet_inp"])
+        task.data["facedet_infer"] = self._hlp_batch_infer(
+            16, 
+            task.data["facedet_inp"],
+            default_out=np.empty((0, 32130, 16), np.float32),
+        )

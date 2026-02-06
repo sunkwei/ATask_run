@@ -52,7 +52,11 @@ class Model_face_score(AModel):
         task.data["face_score_inp"] = face_score_inp
 
     def _infer(self, task: ATask):
-        task.data["face_score_infer"] = self._hlp_batch_infer(32, task.data["face_score_inp"])
+        task.data["face_score_infer"] = self._hlp_batch_infer(
+            32, 
+            task.data["face_score_inp"],
+            default_out=np.empty((0, 10), np.float32),
+        )
     
     def _postprocess(self, task: ATask):
         assert "face_score_infer" in task.data

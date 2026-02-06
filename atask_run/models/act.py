@@ -17,7 +17,8 @@ logger = logging.getLogger("act")
     使用 yolo_act16.onnx 模型
 
         输入： (B, 3, 544, 960)
-        输出： (B, m, 6) m=行为数, 6=(x1,y1,x2,y2,score,cid), 其中 x1,y1,x2,y2 对应输入图像的坐标
+        输出： act_result: [(m, 6), ... ] 
+            m=行为数, 6=(x1,y1,x2,y2,score,cid), 其中 x1,y1,x2,y2 对应输入图像的坐标
 '''
 class Model_act(AModel):
     def _preprocess(self, task: ATask):
@@ -44,7 +45,7 @@ class Model_act(AModel):
             
         if isinstance(task.inpdata, np.ndarray):
             task.data["act_inp"], xr, ry = once(task.inpdata)
-            task.data["acr_rx_ry"] = np.array([(xr, ry)])
+            task.data["act_rx_ry"] = np.array([(xr, ry)])
         elif isinstance(task.inpdata, (tuple, list)):
             imgs = []; rx_ry = []
             for bgr in task.inpdata:
@@ -52,14 +53,17 @@ class Model_act(AModel):
                 imgs.append(img)
                 rx_ry.append((rx, ry))
             task.data["act_inp"] = np.vstack(imgs)
-            task.data["acr_rx_ry"] = np.array(rx_ry)
+            task.data["act_rx_ry"] = np.array(rx_ry)
         else:
             raise TypeError("task.inpdata must be a single image (np.ndarray) or multiple images (tuple | list).")
 
     def _infer(self, task: ATask):
-        task.data["act_infer"] = self._hlp_batch_infer(16, task.data["act_inp"])
+        task.data["act_infer"] = self._hlp_batch_infer(
+            16, 
+            task.data["act_inp"], 
+            default_out=np.empty((0, 20, 10710), np.float32)
+        )
         
-
     def _postprocess(self, task: ATask):
         assert "act_infer" in task.data
         ## 从 (B, 4 + 16, m) 解析，去重，....返回 (B, n, 6)  , 其中 (x1,y1,x2,y2,score,cid)
@@ -71,7 +75,7 @@ class Model_act(AModel):
         task.data["act_result"] = yolo_act_post(task.data["act_infer"], conf_thresh, iou_thresh)
 
         for b in range(B):
-            rx, ry = task.data["acr_rx_ry"][b]
+            rx, ry = task.data["act_rx_ry"][b]
             task.data["act_result"][b][:, (0, 2)] *= rx
             task.data["act_result"][b][:, (1, 3)] *= ry
 

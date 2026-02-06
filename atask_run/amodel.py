@@ -141,10 +141,11 @@ class AModel:
         idx = self.__get_impl_id()
         return self.__backend_impls[idx].infer(*args)
     
-    def _hlp_batch_infer(self, B:int, inp:np.ndarray) -> np.ndarray:
+    def _hlp_batch_infer(self, B:int, inp:np.ndarray, default_out=np.empty((0,), np.float32)) -> np.ndarray:
         ## B 必须 > 0 且为 2 的整数幂，根据 args 数据分解为 B, B/2, B/4, ... 1 推理
         ## 然后合并
         ## FIXME: 目前仅仅支持单输入，且输入为 np.ndarray，形状为 (B, xx, xx, ... )
+        ## default_out: 当没有输入时，返回该值
         assert B > 0 and (B & (B-1)) == 0
         assert self.get_input_count() == 1
 
@@ -168,4 +169,6 @@ class AModel:
             out = self((batch,))[0]
             ret.append(out)
 
+        if not ret:
+            return default_out
         return np.vstack(ret)
