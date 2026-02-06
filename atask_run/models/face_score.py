@@ -67,8 +67,17 @@ class Model_face_score(AModel):
         start = 0
         for b in range(len(task.data["facedet_result_face"])):
             faces = task.data["facedet_result_face"][b]
+            landmarks = task.data["facedet_result_landmark"][b]
+
             end = start + len(faces)
-            face_score_list.append(task.data["face_score_infer"][start:end])
+            face_core = task.data["face_score_infer"][start:end]
             start = end
+            
+            ## 根据 face_score 前三维的和，对 facedet_result_face|landmark 进行排序
+            criteria = face_core[:, :3]
+            order = np.lexsort((-criteria[:,0], -criteria[:,1], -criteria[:,2]))
+            task.data["facedet_result_face"][b] = faces[order]
+            task.data["facedet_result_landmark"][b] = landmarks[order]
+            face_score_list.append(face_core[order])
 
         task.data["face_score_result"] = face_score_list
