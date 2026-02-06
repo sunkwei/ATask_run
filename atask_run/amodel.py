@@ -140,3 +140,32 @@ class AModel:
     def __call__(self, *args):
         idx = self.__get_impl_id()
         return self.__backend_impls[idx].infer(*args)
+    
+    def _hlp_batch_infer(self, B:int, inp:np.ndarray) -> np.ndarray:
+        ## B 必须 > 0 且为 2 的整数幂，根据 args 数据分解为 B, B/2, B/4, ... 1 推理
+        ## 然后合并
+        ## FIXME: 目前仅仅支持单输入，且输入为 np.ndarray，形状为 (B, xx, xx, ... )
+        assert B > 0 and (B & (B-1)) == 0
+        assert self.get_input_count() == 1
+
+        def next_batch(inp0: np.ndarray, batch_size: int):
+            assert batch_size > 0 and (batch_size & (batch_size - 1)) == 0  # 确保是2的幂
+            assert inp0.ndim >= 2
+            S = 0
+            while len(inp0[S:]) >= 1:
+                if len(inp0[S:]) >= batch_size:
+                    yield inp0[S:S+batch_size]
+                    S += batch_size
+                else:
+                    if batch_size == 1:
+                        yield inp0[S:S+1]
+                        break
+                    else:
+                        batch_size //= 2  # 减半batch_size继续尝试
+
+        ret = []
+        for batch in next_batch(inp, B):
+            out = self((batch,))[0]
+            ret.append(out)
+
+        return np.vstack(ret)

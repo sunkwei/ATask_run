@@ -21,7 +21,7 @@ class ImageTestCase(TestCase):
         with APipeWrap(mid.DO_ACT) as pipe:
             result1 = []; result2 = []
 
-            for i in range(8):
+            for i in range(1):
                 task1 = ATask(todo=mid.DO_ACT, inpdata=tuple(images), userdata={})
                 with TimeUsed("test_action_B1"):            
                     pipe.post_task(task1)
@@ -56,7 +56,7 @@ class ImageTestCase(TestCase):
         
         with APipeWrap(mid.DO_ACT) as pipe:
             result = []
-            for i in range(2):
+            for i in range(1):
                 task = ATask(todo=mid.DO_ACT, inpdata=tuple(images), userdata={})
         
                 with TimeUsed("test_action_B8"):
@@ -71,6 +71,34 @@ class ImageTestCase(TestCase):
                 
                 # cv2.imshow("image", img0)
                 # cv2.waitKey(0)
+
+    def test_face_B1(self):
+        fnames = [
+            "picture/teacher.jpg",
+            "picture/student.jpg",
+        ]
+
+        images = [ cv2.imread(fname) for fname in fnames ]
+        
+        with APipeWrap(mid.DO_FACEDET) as pipe:
+            task = ATask(todo=mid.DO_FACEDET, inpdata=tuple(images), userdata={})
+            pipe.post_task(task)
+            task = pipe.wait()
+            faces = task.data["facedet_result_face"]
+            landmarks = task.data["facedet_result_landmark"]
+            for i, r in enumerate(faces):
+                img0 = images[i]
+                for j in range(len(r)):
+                    x1, y1, x2, y2, score = r[j]
+                    cv2.rectangle(img0, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
+
+                    for k in range(5):
+                        cv2.circle(img0, (int(landmarks[i][j, k*2+0]), int(landmarks[i][j, k*2+1])), 2, (0, 0, 255), -1)
+                
+                # cv2
+                cv2.imshow("image", img0)
+                cv2.waitKey(0)
+
 
 if __name__ == "__main__":
     unittest.main()

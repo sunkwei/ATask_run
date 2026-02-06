@@ -31,7 +31,7 @@ from .atask import ATask
 from .aexecutor import AExecutor
 from .model_desc import load_model_config
 from .amodel import AModel
-from .model_id import DO_ASR_VAD
+from .model_id import DO_ASR_VAD, todo2str
 from typing import Tuple
 from queue import Queue
 import os.path as osp
@@ -145,6 +145,14 @@ class APipe:
         info = f"<APipe> ins={id(self)}, enable model:{self.__supported_todo:b}\n"
         info += f"    Q_inp:{self.Q_inp.qsize()}, Q_pre:{self.Q_pre.qsize()}, Q_infer:{self.Q_infer.qsize()}, Q_result:{self.Q_result.qsize()}, Q_sub:{self.Q_inp_sub.qsize()}\n"
         return info
+    
+    def supported_todo_str(self):
+        ## 将 self.__supported_todo 转换为字符串
+        todo_names = []
+        for i in range(64):
+            if self.__supported_todo & (1 << i):
+                todo_names.append(todo2str(1 << i))
+        return ", ".join(todo_names)
         
     def post_task(self, task:ATask):
         ''' 投递任务到 E_inp
@@ -152,8 +160,8 @@ class APipe:
             总是返回成功
         '''
         if task.todo & ~self.__supported_todo:
-            logger.error(f"unsupported todo {task.todo:b} vs {self.__supported_todo:b}")
-            raise Exception("unsupported todo")
+            logger.error(f"unsupported todo: {todo2str(task.todo)}, supported: [{self.supported_todo_str()}]")
+            task.todo &= self.__supported_todo
         
         logger.debug("APipe: pending: {}".format(self.get_qsize()))
         self.Q_inp.put(task)

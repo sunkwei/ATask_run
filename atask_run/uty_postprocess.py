@@ -3,13 +3,16 @@ uty_postprocess 的 Docstring
 
 '''
 import numpy as np
-from typing import List
+from typing import List, Tuple
 import logging
 
 logger = logging.getLogger("uty_post")
 
 def nms(boxes: np.ndarray, scores: np.ndarray, iou_thresh: float) -> List[int]:
-    """标准 NMS，返回保留索引"""
+    """标准 NMS，返回保留索引
+        boxes: (N, 4)  [x,y,w,h]
+        scores: (N, )
+    """
     idxs = scores.argsort()[::-1]
     keep = []
     while idxs.size > 0:
@@ -47,9 +50,6 @@ def yolo_act_post(infer_out: np.ndarray, conf_thresh=0.4, iou_thresh=0.45, cross
         boxes = out[:4].T       # (17010, 4) -> (cx, cy, w, h)
         cls_scores = out[4:]    # (16, 17010)
 
-        # sigmoid 激活
-        # cls_scores = 1 / (1 + np.exp(-cls_logits))
-
         # 取最大类别
         cid = np.argmax(cls_scores, axis=0)
         score = cls_scores[cid, np.arange(cls_scores.shape[1])]
@@ -82,3 +82,39 @@ def yolo_act_post(infer_out: np.ndarray, conf_thresh=0.4, iou_thresh=0.45, cross
 
     return results
 
+def yolo_facedet_post(infer_out: np.ndarray, conf_thresh=0.4, iou_thresh=0.45) -> Tuple[List[np.ndarray], List[np.ndarray]]:
+    '''
+    yolov5 face 人脸检测后处理，输入 infer_out (np.ndarray) (B, 32130, 16)
+    输出 
+        list [ (n, 5), ... ]，人脸框，每个 (x1,y1,x2,y2,score)
+        list [ (n, 10), ... ], 人脸特征点
+    '''
+    batch_size = infer_out.shape[0]
+    result_face = []; result_landmark = []
+
+    for b in range(batch_size):
+        out = infer_out[b]  # (32130, 16)
+        # 16: (x,y,w,h,score,landmark(10))
+
+        ## 使用 score 过滤
+        mask = out[:, 4] > conf_thresh
+        out = out[mask]
+
+        if out.shape[0] == 0:
+            result_face.append(np.zeros((0, 5), dtype=np.float32))
+            result_landmark.append(np.zeros((0, 10), dtype=np.float32))
+            continue
+
+        ## 使用 NMS 过滤
+        keep = nms(out[:, :4], out[:, 4], iou_thresh)
+        out = out[keep]
+
+        ## xywh -> xyxy 格式
+        w = out[:, 2]; h = out[:, 3]
+        out[:, 0] = out[:, 0] - w/2; out[:, 1] = out[:, 1] - h/2
+        out[:, 2] = out[:, 0] + w;   out[:, 3] = out[:, 1] + h
+
+        result_face.append(out[:, :5])
+        result_landmark.append(out[:, 5:15])
+
+    return result_face, result_landmark

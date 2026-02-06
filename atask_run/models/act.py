@@ -57,7 +57,8 @@ class Model_act(AModel):
             raise TypeError("task.inpdata must be a single image (np.ndarray) or multiple images (tuple | list).")
 
     def _infer(self, task: ATask):
-        task.data["act_infer"] = self([task.data["act_inp"]])[0]
+        task.data["act_infer"] = self._hlp_batch_infer(16, task.data["act_inp"])
+        
 
     def _postprocess(self, task: ATask):
         assert "act_infer" in task.data
