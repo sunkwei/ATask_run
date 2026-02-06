@@ -34,7 +34,14 @@ class AModel:
         self.__name = name
         self.__mid = mid
         self.__model_path = model_path
+        self.debug_path = ""
         self.debug = kwargs.get("debug", False)
+        if self.debug:
+            import sys
+            if sys.platform == "win32":
+                self.debug_path = "p:/tmp/debug"
+            else:
+                self.debug_path = "/media/pub/tmp/debug"
 
         logger.info(f"AModel: init: name:{name}, mid:{mid}, model_path:{model_path}, kwargs:{kwargs}")
 

@@ -6,10 +6,10 @@ import unittest
 from atask_run.apipe import ATask, APipe, APipeWrap
 import atask_run.model_id as mid
 import cv2
-from atask_run.timeused import TimeUsed, TimeUsedSum
+from atask_run.timeused import TimeUsed
+from atask_run.uty_postprocess import debug_draw_faceori_box
 
 class ImageTestCase(TestCase):
-
     def _test_action_B1(self):
         fnames = [
             "picture/teacher.jpg",
@@ -80,26 +80,60 @@ class ImageTestCase(TestCase):
 
         images = [ cv2.imread(fname) for fname in fnames ]
         
-        todo0 = mid.DO_ACT | mid.DO_FACEDET | mid.DO_FACE_SCORE | mid.DO_RAISEHANDCLS
+        todo0 = \
+            mid.DO_ACT | \
+            mid.DO_FACEDET | \
+            mid.DO_FACE_SCORE | \
+            mid.DO_RAISEHANDCLS | \
+            mid.DO_FACEREC | \
+            mid.DO_FACEORI | \
+            0
 
-        with APipeWrap(todo0) as pipe:
+        with APipeWrap(todo0, debug=True) as pipe:
             task = ATask(todo=todo0, inpdata=tuple(images), userdata={})
             pipe.post_task(task)
             task = pipe.wait()
-            faces = task.data["facedet_result_face"]
-            landmarks = task.data["facedet_result_landmark"]
-            for i, r in enumerate(faces):
-                img0 = images[i]
-                for j in range(len(r)):
-                    x1, y1, x2, y2, score = r[j]
-                    cv2.rectangle(img0, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
 
-                    for k in range(5):
-                        cv2.circle(img0, (int(landmarks[i][j, k*2+0]), int(landmarks[i][j, k*2+1])), 2, (0, 0, 255), -1)
-                
-                # cv2
-                cv2.imshow("image", img0)
-                cv2.waitKey(0)
+            if mid.DO_FACEDET & todo0:
+                faces = task.data["facedet_result_face"]
+                landmarks = task.data["facedet_result_landmark"]
+
+                if mid.DO_ACT & todo0:
+                    ## 绘制行为
+                    for b, act in enumerate(task.data["act_result"]):
+                        img0 = images[b]
+                        for j in range(len(act)):
+                            x1, y1, x2, y2, score, cid = act[j]
+                            cv2.rectangle(img0, (int(x1), int(y1)), (int(x2), int(y2)), (255, 0, 0), 1)
+                        
+                for b, r in enumerate(faces):
+                    img0 = images[b]
+                    for j in range(len(r)):
+                        x1, y1, x2, y2, score = r[j]
+                        cv2.rectangle(img0, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
+
+                        for k in range(5):
+                            cv2.circle(img0, (int(landmarks[b][j, k*2+0]), int(landmarks[b][j, k*2+1])), 2, (0, 0, 255), -1)
+                    
+                    if todo0 & mid.DO_FACEORI:
+                        ## 绘制 68 特征点
+                        pts68 = task.data["faceori_pts68"][b]  ## (n, 68, 2)
+                        for j in range(len(r)):
+                            for k in range(68):
+                                cv2.circle(img0, (int(pts68[j, k, 0]), int(pts68[j, k, 1])), 1, (0, 0, 255), -1)
+
+                        ## 绘制人脸朝下 3D box
+                        data = {
+                            "faceori_camera_matrix": task.data["faceori_camera_m"][b],
+                            "faceori_dist_coeefs": task.data["faceori_camera_coeefs"][b],
+                            "facedet_result_face": task.data["facedet_result_face"][b],
+                            "faceori_rvec": task.data["faceori_rvec"][b],
+                            "faceori_tvec": task.data["faceori_tvec"][b],
+                        }
+                        debug_draw_faceori_box(img0, data)
+
+                    cv2.imshow("image", img0)
+                    cv2.waitKey(0)
 
 
 if __name__ == "__main__":

@@ -5,6 +5,7 @@ uty_postprocess 的 Docstring
 import numpy as np
 from typing import List, Tuple
 import logging
+import cv2
 
 logger = logging.getLogger("uty_post")
 
@@ -118,3 +119,40 @@ def yolo_facedet_post(infer_out: np.ndarray, conf_thresh=0.4, iou_thresh=0.45) -
         result_landmark.append(out[:, 5:15])
 
     return result_face, result_landmark
+
+def debug_draw_faceori_box(image, data):
+    # 要绘制朝向矩形，需要首先将 faceori_mask 对应的人脸移动到图像中心，才能使用 t_vec!!!
+    cm = data['faceori_camera_matrix']
+    coeefs = data['faceori_dist_coeefs']
+    rear = np.array([(-50.0, -50.0, 0), (50, -50, 0), (50, 50, 0), (-50, 50, 0)])
+    front = np.array([(-80.0, -80.0, 100), (80, -80, 100), (80, 80, 100), (-80, 80, 100)])
+    pt_3d = np.vstack((rear, front)).reshape((-1, 3))
+
+    image_center = np.array((image.shape[1] // 2, image.shape[0] // 2))
+
+    for i in range(len(data['facedet_result_face'])):
+        pt_2d, _ = cv2.projectPoints(pt_3d, data['faceori_rvec'][i], data['faceori_tvec'][i], cm, coeefs)
+        pt_2d = pt_2d.reshape((-1, 2))
+
+        ## 坐标需要减去图像中心，再移动到人脸中心，才能正确绘制
+        ## XXX: 其实应该移动到鼻子
+        x1,y1,x2,y2 = data["facedet_result_face"][i, :4].astype(int)
+        face_center = np.array([(x1+x2)/2, (y1+y2)/2])
+        pt_2d = pt_2d - image_center + face_center
+
+        fp1,fp2,fp3,fp4 = pt_2d[:4, :].astype(int)
+        rp1,rp2,rp3,rp4 = pt_2d[4:, :].astype(int)
+        cv2.line(image, tuple(rp1), tuple(rp2), (0, 244, 244))
+        cv2.line(image, tuple(rp2), tuple(rp3), (0, 244, 244))
+        cv2.line(image, tuple(rp3), tuple(rp4), (0, 244, 244))
+        cv2.line(image, tuple(rp4), tuple(rp1), (0, 244, 244))
+
+        cv2.line(image, tuple(fp1), tuple(fp2), (255, 244, 0))
+        cv2.line(image, tuple(fp2), tuple(fp3), (255, 244, 0))
+        cv2.line(image, tuple(fp3), tuple(fp4), (255, 244, 0))
+        cv2.line(image, tuple(fp4), tuple(fp1), (255, 244, 0))
+
+        cv2.line(image, tuple(rp1), tuple(fp1), (0, 244, 0))
+        cv2.line(image, tuple(rp2), tuple(fp2), (0, 244, 0))
+        cv2.line(image, tuple(rp3), tuple(fp3), (0, 244, 0))
+        cv2.line(image, tuple(rp4), tuple(fp4), (0, 244, 0))
