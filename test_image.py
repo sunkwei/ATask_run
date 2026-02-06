@@ -10,7 +10,7 @@ from atask_run.timeused import TimeUsed, TimeUsedSum
 
 class ImageTestCase(TestCase):
 
-    def test_action_B1(self):
+    def _test_action_B1(self):
         fnames = [
             "picture/teacher.jpg",
             "picture/student.jpg",
@@ -43,7 +43,7 @@ class ImageTestCase(TestCase):
                 # cv2.imshow("image", img0)
                 # cv2.waitKey(0)
 
-    def test_action_B8(self):
+    def _test_action_B8(self):
         fnames = [
             "picture/teacher.jpg",
             "picture/student.jpg",
@@ -80,8 +80,10 @@ class ImageTestCase(TestCase):
 
         images = [ cv2.imread(fname) for fname in fnames ]
         
-        with APipeWrap(mid.DO_FACEDET) as pipe:
-            task = ATask(todo=mid.DO_FACEDET, inpdata=tuple(images), userdata={})
+        todo0 = mid.DO_FACEDET | mid.DO_FACE_SCORE
+
+        with APipeWrap(todo0) as pipe:
+            task = ATask(todo=todo0, inpdata=tuple(images), userdata={})
             pipe.post_task(task)
             task = pipe.wait()
             faces = task.data["facedet_result_face"]

@@ -37,7 +37,7 @@ def load_model_config(
         if (mod_mask & cfg["mid"]) == 0:
             logging.warning(f"skiping {f} for mod mask:{mod_mask:b}")
             continue
-        
+
         cfgs.append(cfg)
 
     ## 检查依赖关系
@@ -139,7 +139,7 @@ def build_default_model_configs(
     
     save("act", mid.DO_ACT, [{"name":"input","dtype":"float32","shape":[1,3,544,960]}], [])
     save("facedet", mid.DO_FACEDET, [{"name":"input","dtype":"float32","shape":[1,3,544,960]}], [])
-    save("facescore", mid.DO_FACE_SCORE, [{"name":"input","dtype":"float32","shape":[1,3,112,112]}], [mid.DO_FACEDET])
+    save("face_score", mid.DO_FACE_SCORE, [{"name":"input","dtype":"float32","shape":[1,3,112,112]}], [mid.DO_FACEDET])
     save("facerec", mid.DO_FACEREC, [{"name":"input","dtype":"float32","shape":[1,3,112,112]}], [mid.DO_FACEDET, mid.DO_FACE_SCORE])
     save("faceori", mid.DO_FACEORI, [{"name":"input","dtype":"float32","shape":[1,3,192,192]}], [mid.DO_FACEDET, mid.DO_FACE_SCORE])
     save("raisehandcls", mid.DO_RAISEHANDCLS, [{"name":"input","dtype":"float32","shape":[1,3,224,224]}], [mid.DO_ACT])
