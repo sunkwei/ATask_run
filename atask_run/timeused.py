@@ -19,7 +19,11 @@ class TimeUsedItem:
         self.min_duration = 999999999.999     ## 最小时长
 
     def __repr__(self) -> str:
-        return f"{self.name}: count: {self.count}, total: {self.total_duration:03f} seconds, avg:{self.total_duration/self.count:.06f} seconds, max:{self.max_duration:.05f} second, min:{self.min_duration:.05f} seconds"
+        return f"{self.name}: count: {self.count}, " \
+            f"total: {self.total_duration:03f} seconds, "\
+            f"avg:{self.total_duration/self.count:.06f} seconds, "\
+            f"max:{self.max_duration:.05f} second, "\
+            f"min:{self.min_duration:.05f} seconds"
 
 @singleton
 class TimeUsedSum:

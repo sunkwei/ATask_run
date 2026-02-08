@@ -93,7 +93,7 @@ class ImageTestCase(TestCase):
             mid.DO_FACEORI | \
             0
 
-        with APipeWrap(todo0, debug=False) as pipe:
+        with APipeWrap(todo0, debug=True) as pipe:
             task = ATask(todo=todo0, inpdata=tuple(images), userdata={})
             pipe.post_task(task)
             task = pipe.wait()
@@ -136,10 +136,11 @@ class ImageTestCase(TestCase):
                         }
                         debug_draw_faceori_box(img0, data)
 
-                    # cv2.imshow("image", img0)
-                    # cv2.waitKey(0)
+                    img = cv2.resize(img0, (960, 540))
+                    cv2.imshow("image", img)
+                    cv2.waitKey(0)
 
-    def test_all_images(self):
+    def _test_all_images(self):
         from pathlib import Path
         P = Path("picture")
         fnames = [ str(p) for p in P.glob("*.jpg") ]
@@ -201,4 +202,5 @@ class ImageTestCase(TestCase):
                         pipe.post_task(task)
 
 if __name__ == "__main__":
-    unittest.main()
+    logging.basicConfig(level=logging.DEBUG)
+    unittest.main(argv=['first-arg-is-ignored'], exit=True)
