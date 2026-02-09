@@ -131,15 +131,15 @@ class AExecutor:
                 break
 
             if self.name == "pre":
-                with TimeUsed(f"pre: {model.name}"):
+                with TimeUsed(f"==> {model.name()} pre"):
                     model._preprocess(task)
                 self.out_q.put(task)
             elif self.name == "infer":
-                with TimeUsed(f"infer: {model.name}"):
+                with TimeUsed(f"==> {model.name()} infer"):
                     model._infer(task)
                 self.out_q.put(task)
             elif self.name == "post":
-                with TimeUsed(f"post: {model.name}"):
+                with TimeUsed(f"==> {model.name()} post"):
                     model._postprocess(task)
                 if not task.done(model.mid()):
                     self.out_q.put(task)
