@@ -6,6 +6,7 @@ import onnxruntime as rt
 from .amodel_impl import AModelBackend
 from typing import List, Tuple, Any
 import logging
+import gc
 
 logger = logging.getLogger("backend_onnxruntime")
 

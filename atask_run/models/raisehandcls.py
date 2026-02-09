@@ -93,4 +93,8 @@ class Model_raisehandcls(AModel):
 
     def _infer(self, task: ATask):
         ## 好吧，模型不支持批次
-        task.data["raisehandcls_infer"] = self._hlp_batch_infer(1, task.data["raisehandcls_inp"], np.empty((0, 3), np.float32))
+        task.data["raisehandcls_infer"] = self._hlp_batch_infer(
+            1, 
+            task.data["raisehandcls_inp"], 
+            np.empty((0, 3), np.float32)
+        )

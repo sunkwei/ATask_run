@@ -76,7 +76,7 @@ class ImageTestCase(TestCase):
                 # cv2.imshow("image", img0)
                 # cv2.waitKey(0)
 
-    def test_face_B1(self):
+    def _test_face_B1(self):
         fnames = [
             "picture/teacher.jpg",
             "picture/student.jpg",
@@ -158,15 +158,28 @@ class ImageTestCase(TestCase):
         with APipeWrap(todo0) as pipe:
             def wait_proc():
                 count = 0
+                act_count = 0
+                face_count = 0
+
                 while 1:
-                    pipe.wait()
+                    task = pipe.wait()
+
+                    ## 统计行为/人脸数
+                    acts = task.data["act_result"]
+                    faces = task.data["facedet_result_face"]
+                    for act in acts:
+                        act_count += len(act)
+                    for face in faces:
+                        face_count += len(face)
+
                     count += 1
                     if count == len(fnames):
+                        logger.info("act count: {}, face count: {}".format(act_count, face_count))
                         break
             th = threading.Thread(target=wait_proc)
             th.start()
 
-            with TimeUsed("test all image"):
+            with TimeUsed("test all image count {}:".format(len(fnames))):
                 for i in range(len(fnames)):
                     img = cv2.imread(fnames[i])
                     task = ATask(todo=todo0, inpdata=img, userdata={"fname": fnames[i]})
@@ -174,7 +187,7 @@ class ImageTestCase(TestCase):
 
                 th.join()
 
-    def __test_images(self, batch_size=1):
+    def __test_images_with_batch(self, batch_size=1):
         from pathlib import Path
         P = Path("picture")
         fnames = [ str(p) for p in P.glob("*.jpg") ]
@@ -190,17 +203,50 @@ class ImageTestCase(TestCase):
             0
         
         with APipeWrap(todo0) as pipe:
-            def wait():
-                for i in range(len(fnames)):
-                    yield pipe.wait()
+            def wait_proc():
+                count = 0
+                act_count = 0
+                face_count = 0
 
-            with TimeUsed(f"test batch size {batch_size}"):
-                for i in range(0, len(fnames), batch_size):
-                    batch = fnames[i : i + batch_size]
-                    tasks = [ ATask(todo=todo0, inpdata=cv2.imread(fname), userdata={"fname": fname}) for fname in batch ]
-                    for task in tasks:
+                while 1:
+                    task = pipe.wait()
+
+                    ## 统计行为/人脸数
+                    acts = task.data["act_result"]
+                    faces = task.data["facedet_result_face"]
+                    for act in acts:
+                        act_count += len(act)
+                    for face in faces:
+                        face_count += len(face)
+
+                    count += len(acts)
+                    if count == len(fnames):
+                        logger.info("act count: {}, face count: {}".format(act_count, face_count))
+                        break
+
+            th = threading.Thread(target=wait_proc)
+            th.start()
+
+            with TimeUsed(f"total: test batch size {batch_size}"):
+                head = 0; tail = len(fnames)
+                while head < tail:
+                    N = min(batch_size, tail - head)
+                    batch = fnames[head : head + N]
+                    image_batch = [ cv2.imread(fname) for fname in batch ]
+                    with TimeUsed("post_task"):
+                        task = ATask(todo=todo0, inpdata=tuple(image_batch), userdata={})
                         pipe.post_task(task)
+                    head += N
+
+                th.join()
+
+    def test_images(self):
+        self.__test_images_with_batch(batch_size=1)
+        self.__test_images_with_batch(batch_size=2)
+        self.__test_images_with_batch(batch_size=4)
+        self.__test_images_with_batch(batch_size=8)
+        self.__test_images_with_batch(batch_size=16)
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.INFO)
     unittest.main(argv=['first-arg-is-ignored'], exit=True)

@@ -43,7 +43,7 @@ class AModel:
             else:
                 self.debug_path = "/media/pub/tmp/debug"
 
-        logger.info(f"AModel: init: name:{name}, mid:{mid}, model_path:{model_path}, kwargs:{kwargs}")
+        # logger.info(f"AModel: init: name:{name}, mid:{mid}, model_path:{model_path}, kwargs:{kwargs}")
 
         backends = kwargs.get("backend", [
             {
@@ -98,10 +98,10 @@ class AModel:
             self.__backend_impls.append(impl)
 
     def __del__(self):
-        logger.info(f"del {self}")
         if hasattr(self, '__backend_impls'):
             for impl in self.__backend_impls:
                 impl.teardown()
+            self.__backend_impls.clear()
 
     def __repr__(self):
         info = f"AModel: {self.__name}, mid:{self.__mid:08x}, path:{self.__model_path}, with {len(self.__backend_impls)} backend impls\n"

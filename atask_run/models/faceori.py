@@ -147,7 +147,7 @@ class Model_faceori(AModel):
     
     def _infer(self, task: ATask):
         task.data["faceori_infer"] = self._hlp_batch_infer(
-            64,
+            32,
             task.data["faceori_inp"],
             default_out=np.empty((0, 212), np.float32),
         )

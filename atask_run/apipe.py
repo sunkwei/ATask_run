@@ -91,7 +91,7 @@ class APipe:
             E_post_num_thread = 1
             E_pre_num_thread = 1
 
-        logger.info(f"APipe: debug:{debug} cfg: Q_inp_size:{Q_inp_size}, E_pre_num_thread:{E_pre_num_thread}, E_infer_num_thread:{E_infer_num_thread}, E_post_num_thread:{E_post_num_thread}")
+        logger.debug(f"APipe: debug:{debug} cfg: Q_inp_size:{Q_inp_size}, E_pre_num_thread:{E_pre_num_thread}, E_infer_num_thread:{E_infer_num_thread}, E_post_num_thread:{E_post_num_thread}")
 
         self.__supported_todo = 0
         self.__model_desc = load_model_config(model_config_path, model_mask)
@@ -141,6 +141,7 @@ class APipe:
         self.E_infer.close()
         self.E_pre.close()
         self.E_post.close()
+        self.__models.clear()
 
     def __repr__(self):
         info = f"<APipe> ins={id(self)}, enable model:{self.supported_todo_str()}\n"
@@ -227,7 +228,7 @@ class APipe:
             module = importlib.import_module(f".models.{name}", package=__package__)
             cls = getattr(module, f"Model_{name}")
             model = cls(**cfg)
-            logger.info(f"APipe: load_models: load {name} success, {model}")
+            logger.debug(f"APipe: load_models: load {name} success, {model}")
             models.append((mid, model))
 
         return models

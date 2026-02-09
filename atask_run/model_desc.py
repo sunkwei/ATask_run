@@ -45,7 +45,7 @@ def load_model_config(
             continue
 
         if (mod_mask & cfg["mid"]) == 0:
-            logging.warning(f"skiping {f}|{cfg['mid']}|{mid.todo2str(cfg['mid'])} for mod mask:{mod_mask:b}")
+            logging.debug(f"skiping {f}|{cfg['mid']}|{mid.todo2str(cfg['mid'])} for mod mask:{mod_mask:b}")
             continue
 
         cfgs.append(cfg)

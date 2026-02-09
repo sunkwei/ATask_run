@@ -41,7 +41,7 @@ class AExecutor:
         for th in self.ths: th.start()
 
     def close(self):
-        logger.info(f"{self.__class__.__name__}.exit {self.name}, threads:{len(self.ths)}")
+        logger.debug(f"{self.__class__.__name__}.exit {self.name}, threads:{len(self.ths)}")
         for _ in self.ths:
             self.inp_q.put(ATask_Quit())
         for th in self.ths: th.join()
