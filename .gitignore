@@ -7,3 +7,4 @@ config_temp/
 .vscode/
 *.txt
 wav/
+picture/

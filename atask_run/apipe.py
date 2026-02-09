@@ -31,7 +31,7 @@ from .atask import ATask
 from .aexecutor import AExecutor
 from .model_desc import load_model_config
 from .amodel import AModel
-from .model_id import DO_ASR_VAD
+from .model_id import DO_ASR_VAD, todo2str
 from typing import Tuple
 from queue import Queue
 import os.path as osp
@@ -50,8 +50,10 @@ class APipe:
         model_mask: int=-1,         ## 启用的模型 bitmask，默认启用所有
         model_config_path: str="./config",
         debug: bool=False,
+        profile: bool=False,
     ):
         self.debug = debug
+        self.profile = profile
 
         Q_inp_sub_size = Q_infer_size = Q_result_size = -1
         Q_pre_size = Q_inp_size * 5
@@ -91,8 +93,8 @@ class APipe:
             E_post_num_thread = 1
             E_pre_num_thread = 1
 
-        logger.info(f"APipe: debug:{debug} cfg: Q_inp_size:{Q_inp_size}, E_pre_num_thread:{E_pre_num_thread}, E_infer_num_thread:{E_infer_num_thread}, E_post_num_thread:{E_post_num_thread}")
-        
+        logger.debug(f"APipe: debug:{debug} cfg: Q_inp_size:{Q_inp_size}, E_pre_num_thread:{E_pre_num_thread}, E_infer_num_thread:{E_infer_num_thread}, E_post_num_thread:{E_post_num_thread}")
+
         self.__supported_todo = 0
         self.__model_desc = load_model_config(model_config_path, model_mask)
         if not self.__model_desc:
@@ -118,12 +120,14 @@ class APipe:
             E_pre_num_thread,
             sub_q = self.Q_inp_sub,
             debug=self.debug,
+            profile=self.profile,
         )
         self.E_infer = AExecutor(
             "infer", find_model, 
             self.Q_pre, self.Q_infer, 
             3,
             debug=self.debug,
+            profile=self.profile,
         )
         self.E_post = AExecutor(
             "post", find_model, 
@@ -131,29 +135,41 @@ class APipe:
             E_post_num_thread, 
             result_q=self.Q_result,
             debug=self.debug,
+            profile=self.profile,
         )
 
         ## 根据配置的模型，加载所有模型
+        ## 模型顺序已经根据依赖关系排序
         self.__models = self.__load_models()    # [ (mid, instance), ... ]
 
     def close(self):
         self.E_infer.close()
         self.E_pre.close()
         self.E_post.close()
+        self.__models.clear()
 
     def __repr__(self):
         info = f"<APipe> ins={id(self)}, enable model:{self.__supported_todo:b}"
         # info += f"    Q_inp:{self.Q_inp.qsize()}, Q_pre:{self.Q_pre.qsize()}, Q_infer:{self.Q_infer.qsize()}, Q_result:{self.Q_result.qsize()}, Q_sub:{self.Q_inp_sub.qsize()}\n"
         return info
+    
+    def supported_todo_str(self):
+        ## 将 self.__supported_todo 转换为字符串
+        todo_names = []
+        for i in range(64):
+            if self.__supported_todo & (1 << i):
+                todo_names.append(todo2str(1 << i))
+        return ", ".join(todo_names)
         
     def post_task(self, task:ATask):
         ''' 投递任务到 E_inp
             XXX: 如果 E_inp 满，将阻塞，
-            总是返回成功
+            总是返回成功，如果 todo 包含不支持的模型，抛出异常
         '''
         if task.todo & ~self.__supported_todo:
-            logger.error(f"unsupported todo {task.todo:b} vs {self.__supported_todo:b}")
-            raise Exception("unsupported todo")
+            logger.error(f"unsupported todo: {todo2str(task.todo)}, supported: [{self.supported_todo_str()}]")
+            raise Exception(f"unsupported todo: {todo2str(task.todo)}, supported: [{self.supported_todo_str()}]")
+            task.todo &= self.__supported_todo
         
         # logger.debug("APipe: pending: {}".format(self.get_qsize()))
         self.Q_inp.put(task)
@@ -166,7 +182,13 @@ class APipe:
 
     def get_qsize(self) -> Tuple[int, int, int, int, int]:
         ## 返回四个 queue 的等待数，一定程度上可以用于评估性能瓶颈
-        return self.Q_inp.qsize(), self.Q_inp_sub.qsize(), self.Q_pre.qsize(), self.Q_infer.qsize(), self.Q_result.qsize()
+        return (
+            self.Q_inp.qsize(), 
+            self.Q_inp_sub.qsize(), 
+            self.Q_pre.qsize(), 
+            self.Q_infer.qsize(), 
+            self.Q_result.qsize()
+        )
     
     def __get_model_from_todo(self, task:ATask) -> AModel | None:
         ## 被执行器调用，根据模型顺序，以及 task 剩余的 todo 位，找到对应的模型
@@ -177,7 +199,7 @@ class APipe:
         return None
             
     def __load_models(self):
-        # TODO: to load enabled models, and do register
+        # to load enabled models, and do register
         import importlib
         models = [
             # (mid, instance)
@@ -217,12 +239,13 @@ class APipe:
 
 
 class APipeWrap:
-    def __init__(self, model_mask: int=-1, debug:bool=False):
+    def __init__(self, model_mask: int=-1, debug:bool=False, profile:bool=False):
         self.__model_mask = model_mask
         self.__debug = debug
+        self.__profile = profile
 
     def __enter__(self):
-        self.__pipe = APipe(model_mask=self.__model_mask, debug=self.__debug)
+        self.__pipe = APipe(model_mask=self.__model_mask, debug=self.__debug, profile=self.__profile)
         return self.__pipe
 
     def __exit__(self, exc_type, exc_value, traceback):

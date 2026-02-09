@@ -6,6 +6,7 @@ import onnxruntime as rt
 from .amodel_impl import AModelBackend
 from typing import List, Tuple, Any
 import logging
+import gc
 
 logger = logging.getLogger("backend_onnxruntime")
 
@@ -55,7 +56,11 @@ class OnnxruntimeBackend(AModelBackend):
         return len(self.input_names)
 
     def get_input_shape(self, idx: int) -> tuple[int, ...]:
-        return self.sess.get_inputs()[idx].shape
+        ss = self.sess.get_inputs()[idx].shape
+        for i in range(len(ss)):
+            if isinstance(ss[i], str):
+                ss[i] = -1
+        return tuple(ss)
 
     def get_input_dtype(self, idx: int) -> str:
         return self.sess.get_inputs()[idx].type

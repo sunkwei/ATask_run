@@ -1,0 +1,252 @@
+''' 测试用例，测试图像任务
+'''
+
+from unittest import TestCase
+import unittest
+from atask_run.apipe import ATask, APipe, APipeWrap
+import atask_run.model_id as mid
+import cv2
+import logging
+from atask_run.timeused import TimeUsed
+from atask_run.uty_postprocess import debug_draw_faceori_box
+import threading
+
+logger = logging.getLogger(__name__)
+
+class ImageTestCase(TestCase):
+    def _test_action_B1(self):
+        fnames = [
+            "picture/teacher.jpg",
+            "picture/student.jpg",
+        ]
+
+        images = [ cv2.imread(fname) for fname in fnames ]
+        
+        with APipeWrap(mid.DO_ACT) as pipe:
+            result1 = []; result2 = []
+
+            for i in range(1):
+                task1 = ATask(todo=mid.DO_ACT, inpdata=tuple(images), userdata={})
+                with TimeUsed("test_action_B1"):            
+                    pipe.post_task(task1)
+                    result1 = pipe.wait().data["act_result"]
+
+                task2 = ATask(todo=mid.DO_ACT, inpdata=tuple(images), userdata={})
+                with TimeUsed("test_action_B1"):            
+                    pipe.post_task(task2)
+                    result2 = pipe.wait().data["act_result"]
+
+            result = [ result1[0], result2[0] ]
+            
+            for i, r in enumerate(result):
+                img0 = images[i]
+                for j in range(len(r)):
+                    x1, y1, x2, y2, score, cid = r[j]
+                    cv2.rectangle(img0, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
+                
+                # cv2.imshow("image", img0)
+                # cv2.waitKey(0)
+
+    def _test_action_B8(self):
+        fnames = [
+            "picture/teacher.jpg",
+            "picture/student.jpg",
+        ]
+
+        images = [ cv2.imread(fname) for fname in fnames ]
+        images.extend(images)
+        images.extend(images)
+        images.extend(images)
+        
+        with APipeWrap(mid.DO_ACT) as pipe:
+            result = []
+            for i in range(1):
+                task = ATask(todo=mid.DO_ACT, inpdata=tuple(images), userdata={})
+        
+                with TimeUsed("test_action_B8"):
+                    pipe.post_task(task)
+                    result = pipe.wait().data["act_result"]
+            
+            for i, r in enumerate(result):
+                img0 = images[i]
+                for j in range(len(r)):
+                    x1, y1, x2, y2, score, cid = r[j]
+                    cv2.rectangle(img0, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
+                
+                # cv2.imshow("image", img0)
+                # cv2.waitKey(0)
+
+    def _test_face_B1(self):
+        fnames = [
+            "picture/teacher.jpg",
+            "picture/student.jpg",
+        ]
+
+        images = [ cv2.imread(fname) for fname in fnames ]
+        
+        todo0 = \
+            mid.DO_ACT | \
+            mid.DO_FACEDET | \
+            mid.DO_FACE_SCORE | \
+            mid.DO_RAISEHANDCLS | \
+            mid.DO_FACEREC | \
+            mid.DO_FACEORI | \
+            0
+
+        with APipeWrap(todo0, debug=True) as pipe:
+            task = ATask(todo=todo0, inpdata=tuple(images), userdata={})
+            pipe.post_task(task)
+            task = pipe.wait()
+
+            if mid.DO_FACEDET & todo0:
+                faces = task.data["facedet_result_face"]
+                landmarks = task.data["facedet_result_landmark"]
+
+                if mid.DO_ACT & todo0:
+                    ## 绘制行为
+                    for b, act in enumerate(task.data["act_result"]):
+                        img0 = images[b]
+                        for j in range(len(act)):
+                            x1, y1, x2, y2, score, cid = act[j]
+                            cv2.rectangle(img0, (int(x1), int(y1)), (int(x2), int(y2)), (255, 0, 0), 1)
+                        
+                for b, r in enumerate(faces):
+                    img0 = images[b]
+                    for j in range(len(r)):
+                        x1, y1, x2, y2, score = r[j]
+                        cv2.rectangle(img0, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
+
+                        for k in range(5):
+                            cv2.circle(img0, (int(landmarks[b][j, k*2+0]), int(landmarks[b][j, k*2+1])), 2, (0, 0, 255), -1)
+                    
+                    if todo0 & mid.DO_FACEORI:
+                        ## 绘制 68 特征点
+                        pts68 = task.data["faceori_pts68"][b]  ## (n, 68, 2)
+                        for j in range(len(r)):
+                            for k in range(68):
+                                cv2.circle(img0, (int(pts68[j, k, 0]), int(pts68[j, k, 1])), 1, (0, 0, 255), -1)
+
+                        ## 绘制人脸朝下 3D box
+                        data = {
+                            "faceori_camera_matrix": task.data["faceori_camera_m"][b],
+                            "faceori_dist_coeefs": task.data["faceori_camera_coeefs"][b],
+                            "facedet_result_face": task.data["facedet_result_face"][b],
+                            "faceori_rvec": task.data["faceori_rvec"][b],
+                            "faceori_tvec": task.data["faceori_tvec"][b],
+                        }
+                        debug_draw_faceori_box(img0, data)
+
+                    img = cv2.resize(img0, (960, 540))
+                    cv2.imshow("image", img)
+                    cv2.waitKey(0)
+
+    def _test_all_images(self):
+        from pathlib import Path
+        P = Path("picture")
+        fnames = [ str(p) for p in P.glob("*.jpg") ]
+        logger.info("there are {} pictures".format(len(fnames)))
+
+        todo0 = \
+            mid.DO_ACT | \
+            mid.DO_FACEDET | \
+            mid.DO_FACE_SCORE | \
+            mid.DO_RAISEHANDCLS | \
+            mid.DO_FACEREC | \
+            mid.DO_FACEORI | \
+            0
+        
+        with APipeWrap(todo0) as pipe:
+            def wait_proc():
+                count = 0
+                act_count = 0
+                face_count = 0
+
+                while 1:
+                    task = pipe.wait()
+
+                    ## 统计行为/人脸数
+                    acts = task.data["act_result"]
+                    faces = task.data["facedet_result_face"]
+                    for act in acts:
+                        act_count += len(act)
+                    for face in faces:
+                        face_count += len(face)
+
+                    count += 1
+                    if count == len(fnames):
+                        logger.info("act count: {}, face count: {}".format(act_count, face_count))
+                        break
+            th = threading.Thread(target=wait_proc)
+            th.start()
+
+            with TimeUsed("test all image count {}:".format(len(fnames))):
+                for i in range(len(fnames)):
+                    img = cv2.imread(fnames[i])
+                    task = ATask(todo=todo0, inpdata=img, userdata={"fname": fnames[i]})
+                    pipe.post_task(task)
+
+                th.join()
+
+    def __test_images_with_batch(self, batch_size=1, profile:bool=False):
+        from pathlib import Path
+        P = Path("picture")
+        fnames = [ str(p) for p in P.glob("*.jpg") ]
+        logger.info("there are {} pictures".format(len(fnames)))
+
+        todo0 = \
+            mid.DO_ACT | \
+            mid.DO_FACEDET | \
+            mid.DO_FACE_SCORE | \
+            mid.DO_RAISEHANDCLS | \
+            mid.DO_FACEREC | \
+            mid.DO_FACEORI | \
+            0
+        
+        with APipeWrap(todo0, profile=profile) as pipe:
+            def wait_proc():
+                count = 0
+                act_count = 0
+                face_count = 0
+
+                while 1:
+                    task = pipe.wait()
+
+                    ## 统计行为/人脸数
+                    acts = task.data["act_result"]
+                    faces = task.data["facedet_result_face"]
+                    for act in acts:
+                        act_count += len(act)
+                    for face in faces:
+                        face_count += len(face)
+
+                    count += len(acts)
+                    if count == len(fnames):
+                        logger.info("act count: {}, face count: {}".format(act_count, face_count))
+                        break
+
+            th = threading.Thread(target=wait_proc)
+            th.start()
+
+            with TimeUsed(f"total: test batch size {batch_size}", with_cuda=True, with_cpu=True):
+                head = 0; tail = len(fnames)
+                while head < tail:
+                    N = min(batch_size, tail - head)
+                    batch = fnames[head : head + N]
+                    image_batch = [ cv2.imread(fname) for fname in batch ]
+                    with TimeUsed("post atask"):
+                        task = ATask(todo=todo0, inpdata=tuple(image_batch), userdata={})
+                        pipe.post_task(task)
+                    head += N
+
+                th.join()   ## 等待所有任务完成
+
+    def test_images(self):
+        self.__test_images_with_batch(batch_size=1)
+        self.__test_images_with_batch(batch_size=2, profile=True)
+        self.__test_images_with_batch(batch_size=4)
+        self.__test_images_with_batch(batch_size=8)
+        self.__test_images_with_batch(batch_size=16)
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
+    unittest.main(argv=['first-arg-is-ignored'], exit=True)

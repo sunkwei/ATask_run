@@ -18,26 +18,36 @@ def load_model_config(
     config_path="./config",
     mod_mask:int=-1,
 ) -> List[Dict]:
-    '''
-    根据 mod_mask 从 config_path 目录中加载所有 yaml 文件
-    并根据依赖关系返回模型列表
+    """
+    根据指定的模块掩码从配置目录中加载模型配置文件。
 
-    如果依赖关系因为 mod_mask 不满足，抛出异常
-    '''
+    该函数会扫描指定路径下的所有 YAML 文件，过滤出有效的模型配置，
+    并根据模型之间的依赖关系进行排序，确保被依赖的模型优先加载。
+
+    Args:
+        config_path (str): 配置文件所在目录路径，默认为 "./config"
+        mod_mask (int): 模块掩码，用于过滤需要加载的模型，默认为 -1（加载所有模型）
+
+    Returns:
+        List[Dict]: 按依赖关系排序后的模型配置列表，被依赖的模型排在前面
+
+    Raises:
+        Exception: 当模型的依赖关系无法满足时抛出异常，提示缺失的依赖模块
+    """
     from pathlib import Path
     P = Path(config_path)
     cfgs = []
     for f in P.glob("*.yaml"):
         with open(f, encoding="utf8") as f:
          cfg = yaml.load(f, Loader=yaml.loader.FullLoader)
-        if "mid" not in cfg:
+        if "mid" not in cfg or "model_path" not in cfg or "name" not in cfg:
             ## 非有效模型配置
             continue
 
         if (mod_mask & cfg["mid"]) == 0:
             # logging.warning(f"skiping {f} for mod mask:{mod_mask:b}")
             continue
-        
+
         cfgs.append(cfg)
     
     ## 检查依赖关系
@@ -45,15 +55,15 @@ def load_model_config(
         deps = cfg["depend"]
         for dep in deps:
             if dep not in [c["mid"] for c in cfgs]:
-                raise Exception(f"{cfg['model_path']} depend: {dep} is not found")
+                raise Exception(f"{cfg['model_path']} depend: {dep}|{mid.todo2str(dep)} is not found")
 
-    ## 根据依赖关系排序 cfgs，被依赖的模型排在前面
+    ## 根据依赖关系排序 cfg
     for i, _ in enumerate(cfgs):
         for j, cfg in enumerate(cfgs):
             if cfg["mid"] == cfgs[i]["mid"] or cfg["mid"] in cfgs[i]["depend"]:
                 cfgs[j], cfgs[i] = cfgs[i], cfgs[j]
 
-    return cfgs[::-1]
+    return cfgs[::-1]   ## 反序，被依赖的放到前面
 
 def build_default_model_configs(
     config_path="./config_temp", 
@@ -139,7 +149,7 @@ def build_default_model_configs(
     
     save("act", mid.DO_ACT, [{"name":"input","dtype":"float32","shape":[1,3,544,960]}], [])
     save("facedet", mid.DO_FACEDET, [{"name":"input","dtype":"float32","shape":[1,3,544,960]}], [])
-    save("facescore", mid.DO_FACE_SCORE, [{"name":"input","dtype":"float32","shape":[1,3,112,112]}], [mid.DO_FACEDET])
+    save("face_score", mid.DO_FACE_SCORE, [{"name":"input","dtype":"float32","shape":[1,3,112,112]}], [mid.DO_FACEDET])
     save("facerec", mid.DO_FACEREC, [{"name":"input","dtype":"float32","shape":[1,3,112,112]}], [mid.DO_FACEDET, mid.DO_FACE_SCORE])
     save("faceori", mid.DO_FACEORI, [{"name":"input","dtype":"float32","shape":[1,3,192,192]}], [mid.DO_FACEDET, mid.DO_FACE_SCORE])
     save("raisehandcls", mid.DO_RAISEHANDCLS, [{"name":"input","dtype":"float32","shape":[1,3,224,224]}], [mid.DO_ACT])
@@ -292,3 +302,11 @@ def build_default_model_configs(
         [mid.DO_T5_ENCODER, mid.DO_T5_DEC1ST],
     )
     return None
+
+if __name__ == "__main__":
+    from argparse import ArgumentParser
+    ap = ArgumentParser()
+    ap.add_argument("--config_path", default="./config_temp", type=str, help="the path saving generated config files")
+    ap.add_argument("--model_path", default="./model_temp", type=str, help="the path saving model files")
+    args = ap.parse_args()
+    build_default_model_configs(args.config_path, args.model_path)

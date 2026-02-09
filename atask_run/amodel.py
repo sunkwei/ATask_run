@@ -34,9 +34,16 @@ class AModel:
         self.__name = name
         self.__mid = mid
         self.__model_path = model_path
+        self.debug_path = ""
         self.debug = kwargs.get("debug", False)
+        if self.debug:
+            import sys
+            if sys.platform == "win32":
+                self.debug_path = "p:/tmp/debug"
+            else:
+                self.debug_path = "/media/pub/tmp/debug"
 
-        logger.info(f"AModel: init: name:{name}, mid:{mid}, model_path:{model_path}, kwargs:{kwargs}")
+        # logger.info(f"AModel: init: name:{name}, mid:{mid}, model_path:{model_path}, kwargs:{kwargs}")
 
         backends = kwargs.get("backend", [
             {
@@ -91,10 +98,10 @@ class AModel:
             self.__backend_impls.append(impl)
 
     def __del__(self):
-        # logger.info(f"del {self}")
         if hasattr(self, '__backend_impls'):
             for impl in self.__backend_impls:
                 impl.teardown()
+            self.__backend_impls.clear()
 
     def __repr__(self):
         info = f"AModel: {self.__name}, mid:{self.__mid:08x}, path:{self.__model_path}, with {len(self.__backend_impls)} backend impls\n"
@@ -110,6 +117,12 @@ class AModel:
     
     def model_path(self) -> str:
         return self.__model_path
+    
+    def get_input_count(self) -> int:
+        return self.__backend_impls[0].get_input_num()
+    
+    def get_input_shape(self, i:int) -> tuple[int, ...]:
+        return self.__backend_impls[0].get_input_shape(i)
     
     def _preprocess(self, task:ATask):
         pass
@@ -139,3 +152,35 @@ class AModel:
         """稳定的softmax实现"""
         exp_x = np.exp(x - np.max(x))
         return exp_x / np.sum(exp_x)
+    
+    def _hlp_batch_infer(self, B:int, inp:np.ndarray, default_out=np.empty((0,), np.float32)) -> np.ndarray:
+        ## B 必须 > 0 且为 2 的整数幂，根据 args 数据分解为 B, B/2, B/4, ... 1 推理
+        ## 然后合并
+        ## FIXME: 目前仅仅支持单输入，且输入为 np.ndarray，形状为 (B, xx, xx, ... )
+        ## default_out: 当没有输入时，返回该值
+        assert B > 0 and (B & (B-1)) == 0
+        assert self.get_input_count() == 1
+
+        def next_batch(inp0: np.ndarray, batch_size: int):
+            assert batch_size > 0 and (batch_size & (batch_size - 1)) == 0  # 确保是2的幂
+            assert inp0.ndim >= 2
+            S = 0
+            while len(inp0[S:]) >= 1:
+                if len(inp0[S:]) >= batch_size:
+                    yield inp0[S:S+batch_size]
+                    S += batch_size
+                else:
+                    if batch_size == 1:
+                        yield inp0[S:S+1]
+                        break
+                    else:
+                        batch_size //= 2  # 减半batch_size继续尝试
+
+        ret = []
+        for batch in next_batch(inp, B):
+            out = self((batch,))[0]
+            ret.append(out)
+
+        if not ret:
+            return default_out
+        return np.vstack(ret)
