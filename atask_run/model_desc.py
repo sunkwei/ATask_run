@@ -10,9 +10,9 @@
 import yaml
 from . import model_id as mid
 from typing import List, Dict
-import logging
+# import logging
 
-logger = logging.getLogger("model_desc")
+# logger = logging.getLogger("asr_runner")
 
 def load_model_config(
     config_path="./config",
@@ -35,11 +35,11 @@ def load_model_config(
             continue
 
         if (mod_mask & cfg["mid"]) == 0:
-            logging.warning(f"skiping {f} for mod mask:{mod_mask:b}")
+            # logging.warning(f"skiping {f} for mod mask:{mod_mask:b}")
             continue
         
         cfgs.append(cfg)
-
+    
     ## 检查依赖关系
     for i, cfg in enumerate(cfgs):
         deps = cfg["depend"]
@@ -209,5 +209,86 @@ def build_default_model_configs(
             {"name":"textnorm","dtype":"int32","shape":[1]},
         ],
         [mid.DO_ASR_ENCODE, mid.DO_ASR_PREDICTOR, mid.DO_ASR_DECODE, mid.DO_ASR_STAMP],
+    )
+    save(
+        "sv",
+        mid.DO_VOICEPRINT,
+        [
+            {"name":"speech","dtype":"float","shape":[1,-1,80]},
+        ],
+        [],
+    )
+    save(
+        "v4",
+        mid.DO_4CLS,
+        [
+            {"name":"input","dtype":"float","shape":[1,1,80,202]},
+        ],
+        [],
+    )
+    save(
+        "t5_enc",
+        mid.DO_T5_ENCODER,
+        [
+            {"name":"input_ids","dtype":"int32","shape":[1,-1]},
+            {"name":"attention_mask","dtype":"int32","shape":[1,-1]},
+        ],
+        [],
+    )
+
+    save(
+        "t5_dec_1st",
+        mid.DO_T5_DEC1ST,
+        [
+            {"name":"input_id","dtype":"int32","shape":[1,1]},
+            {"name":"input_mask","dtype":"int32","shape":[1,1]},
+            {"name":"enc_hidden_state","dtype":"float","shape":[1,-1,512]},
+            {"name":"enc_attention_mask","dtype":"int32","shape":[1,-1]},
+        ],
+        [mid.DO_T5_ENCODER],
+    )
+
+    save(
+        "t5_dec_kvs",
+        mid.DO_T5_DECKVS,
+        [
+            {"name":"input_id","dtype":"int32","shape":[1,1]},
+            {"name":"input_mask","dtype":"int32","shape":[1,1]},
+            {"name":"enc_hidden_state","dtype":"float","shape":[1,-1,512]},
+            {"name":"enc_attention_mask","dtype":"int32","shape":[1,-1]},
+            {"name":"in_kvs_0_0","dtype":"float","shape":[1,6,-1,64]},
+            {"name":"in_kvs_0_1","dtype":"float","shape":[1,6,-1,64]},
+            {"name":"in_kvs_0_2","dtype":"float","shape":[1,6,-1,64]},
+            {"name":"in_kvs_0_3","dtype":"float","shape":[1,6,-1,64]},
+            {"name":"in_kvs_1_0","dtype":"float","shape":[1,6,-1,64]},
+            {"name":"in_kvs_1_1","dtype":"float","shape":[1,6,-1,64]},
+            {"name":"in_kvs_1_2","dtype":"float","shape":[1,6,-1,64]},
+            {"name":"in_kvs_1_3","dtype":"float","shape":[1,6,-1,64]},
+            {"name":"in_kvs_2_0","dtype":"float","shape":[1,6,-1,64]},
+            {"name":"in_kvs_2_1","dtype":"float","shape":[1,6,-1,64]},
+            {"name":"in_kvs_2_2","dtype":"float","shape":[1,6,-1,64]},
+            {"name":"in_kvs_2_3","dtype":"float","shape":[1,6,-1,64]},
+            {"name":"in_kvs_3_0","dtype":"float","shape":[1,6,-1,64]},
+            {"name":"in_kvs_3_1","dtype":"float","shape":[1,6,-1,64]},
+            {"name":"in_kvs_3_2","dtype":"float","shape":[1,6,-1,64]},
+            {"name":"in_kvs_3_3","dtype":"float","shape":[1,6,-1,64]},
+            {"name":"in_kvs_4_0","dtype":"float","shape":[1,6,-1,64]},
+            {"name":"in_kvs_4_1","dtype":"float","shape":[1,6,-1,64]},
+            {"name":"in_kvs_4_2","dtype":"float","shape":[1,6,-1,64]},
+            {"name":"in_kvs_4_3","dtype":"float","shape":[1,6,-1,64]},
+            {"name":"in_kvs_5_0","dtype":"float","shape":[1,6,-1,64]},
+            {"name":"in_kvs_5_1","dtype":"float","shape":[1,6,-1,64]},
+            {"name":"in_kvs_5_2","dtype":"float","shape":[1,6,-1,64]},
+            {"name":"in_kvs_5_3","dtype":"float","shape":[1,6,-1,64]},
+            {"name":"in_kvs_6_0","dtype":"float","shape":[1,6,-1,64]},
+            {"name":"in_kvs_6_1","dtype":"float","shape":[1,6,-1,64]},
+            {"name":"in_kvs_6_2","dtype":"float","shape":[1,6,-1,64]},
+            {"name":"in_kvs_6_3","dtype":"float","shape":[1,6,-1,64]},
+            {"name":"in_kvs_7_0","dtype":"float","shape":[1,6,-1,64]},
+            {"name":"in_kvs_7_1","dtype":"float","shape":[1,6,-1,64]},
+            {"name":"in_kvs_7_2","dtype":"float","shape":[1,6,-1,64]},
+            {"name":"in_kvs_7_3","dtype":"float","shape":[1,6,-1,64]},
+        ],
+        [mid.DO_T5_ENCODER, mid.DO_T5_DEC1ST],
     )
     return None

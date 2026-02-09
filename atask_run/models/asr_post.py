@@ -174,12 +174,19 @@ def time_stamp_lfr6_onnx(us_cif_peak, char_list, onnx=1, begin_time=0.0, total_o
             res.append([int(timestamp[0] * 1000), int(timestamp[1] * 1000)])
     return res_str, res
 
+import re
 ## 来自 funasr_onnx/utils/postprocess_utils.py
 def isChinese(ch: str):
     if "\u4e00" <= ch <= "\u9fff" or "\u0030" <= ch <= "\u0039":
         return True
     return False
 
+def isEnglish(text:str):
+    if re.search('^[a-zA-Z\']+$', text):
+        return True
+    else:
+        return False
+    
 ## 来自 funasr_onnx/utils/postprocess_utils.py
 def isAllChinese(word: Union[List[Any], str]):
     word_lists = []
@@ -217,6 +224,90 @@ def isAllAlpha(word: Union[List[Any], str]):
 
     return True
 
+def isAllAlpha1(word):
+        word_lists = []
+        for i in word:
+            cur = i.replace(' ', '')
+            cur = cur.replace('</s>', '')
+            cur = cur.replace('<s>', '')
+            word_lists.append(cur)
+
+        if len(word_lists) == 0:
+            return 0
+        
+        chinese = 0
+        en = 0
+        for ch in word_lists:
+            if len(ch) > 0 and ('\u4e00' <= ch <= '\u9fff' or '\u0030' <= ch <= '\u0039') \
+                and ch.isdigit() is False:
+                chinese = 1        
+            else:
+                en = 1
+
+        if chinese == 1 and en == 1:
+            # 中英混合
+            return 0
+        elif chinese == 1 and en == 0:
+            # 纯中文
+            return 1
+        else:
+            # 纯英文
+            return 2
+def merge_en_str(txt_list):
+
+    txt_list_new = []
+    m = ""
+    for i in range(len(txt_list)):
+        t = txt_list[i]
+        if not isEnglish(t) or len(t) >1:
+            if len(m) > 0:
+                txt_list_new.append(m)
+                m = ""
+            txt_list_new.append(t)
+
+        else:
+            m = m + t
+
+        if i == len(txt_list) - 1 and len(m) > 1:
+            txt_list_new.append(m)
+
+    return txt_list_new
+
+def check_stamp_txt(txt, time_list, language):
+    if len(txt) > len(time_list):
+            txt = merge_en_str(txt)
+
+    if len(time_list) != len(txt):
+        # 强制保证字数跟时间戳个数相同，否则后面统计出错
+        if len(txt) > len(time_list):
+            dif_num = len(txt) - len(time_list)
+            for ii in range(dif_num):
+                time_list.append(time_list[-1])
+        else:
+            dif_num = len(time_list) - len(txt)
+            for ii in range(dif_num):
+                txt.append(txt[-1])
+
+    assert len(time_list) == len(txt)
+    txt_new = []
+    time_list_new = []
+    if language == "en":
+        # 英文句子
+        max_time = 1000
+    else:
+        max_time = 500
+    for ti in range(len(time_list)):
+        # 一个字最长不能持续0.5秒的时间
+        if time_list[ti][1] - time_list[ti][0] <= max_time:
+            txt_new.append(txt[ti])
+            time_list_new.append(time_list[ti])
+        else:
+            txt_new.append(txt[ti])
+            time_list[ti][1] = time_list[ti][0] + max_time
+            time_list_new.append(time_list[ti])
+    
+    return txt_new, time_list_new
+    
 ## 参考 funasr_onnx/utils/postprocess_utils.py
 def abbr_dispose(
     words: List[Any], 
@@ -307,43 +398,49 @@ def abbr_dispose(
         return word_lists
 
 ## 来自 funasr_onnx/utils/postprocess_utils.py
-def sentence_postprocess(words: List[Any], time_stamp: List[List]|None=None):
+def sentence_postprocess(words: List[Any], time_stamp: List[List] = None):
     middle_lists = []
     word_lists = []
-    word_item = ""
+    word_item = ''
     ts_lists = []
-    begin = -1
-
     # wash words lists
     for i in words:
-        word = ""
+        word = ''
         if isinstance(i, str):
             word = i
         else:
-            word = i.decode("utf-8")
+            word = i.decode('utf-8')
 
-        if word in ["<s>", "</s>", "<unk>"]:
+        if word in ['<s>', '</s>', '<unk>']:
             continue
         else:
             middle_lists.append(word)
 
+    is_all_en = 0
     # all chinese characters
     if isAllChinese(middle_lists):
         for i, ch in enumerate(middle_lists):
-            word_lists.append(ch.replace(" ", ""))
+            word_lists.append(ch.replace(' ', ''))
         if time_stamp is not None:
             ts_lists = time_stamp
 
     # all alpha characters
     elif isAllAlpha(middle_lists):
+        is_all_en = 1
         ts_flag = True
         for i, ch in enumerate(middle_lists):
             if ts_flag and time_stamp is not None:
                 begin = time_stamp[i][0]
                 end = time_stamp[i][1]
-            word = ""
-            if "@@" in ch:
-                word = ch.replace("@@", "")
+            word = ''
+            if '@@' in ch:
+                word = ch.replace('@@', '')
+                word_item += word
+                if time_stamp is not None:
+                    ts_flag = False
+                    end = time_stamp[i][1]
+            elif '@' in ch:
+                word = ch.replace('@', '')
                 word_item += word
                 if time_stamp is not None:
                     ts_flag = False
@@ -351,8 +448,8 @@ def sentence_postprocess(words: List[Any], time_stamp: List[List]|None=None):
             else:
                 word_item += ch
                 word_lists.append(word_item)
-                word_lists.append(" ")
-                word_item = ""
+                word_lists.append(' ')
+                word_item = ''
                 if time_stamp is not None:
                     ts_flag = True
                     end = time_stamp[i][1]
@@ -365,11 +462,12 @@ def sentence_postprocess(words: List[Any], time_stamp: List[List]|None=None):
         ts_flag = True
         begin = -1
         end = -1
+
         for i, ch in enumerate(middle_lists):
             if ts_flag and time_stamp is not None:
                 begin = time_stamp[i][0]
                 end = time_stamp[i][1]
-            word = ""
+            word = ''
             if isAllChinese(ch):
                 if alpha_blank is True:
                     word_lists.pop()
@@ -379,31 +477,52 @@ def sentence_postprocess(words: List[Any], time_stamp: List[List]|None=None):
                     ts_flag = True
                     ts_lists.append([begin, end])
                     begin = end
-            elif "@@" in ch:
-                word = ch.replace("@@", "")
+            elif '@@' in ch:
+                word = ch.replace('@@', '')
                 word_item += word
                 alpha_blank = False
                 if time_stamp is not None:
                     ts_flag = False
                     end = time_stamp[i][1]
+            elif '@' in ch:
+                word = ch.replace('@', '')
+                word_item += word
+                alpha_blank = False
+                if time_stamp is not None:
+                    ts_flag = False
+                    end = time_stamp[i][1]
+
             elif isAllAlpha(ch):
                 word_item += ch
                 word_lists.append(word_item)
-                word_lists.append(" ")
-                word_item = ""
+                word_lists.append(' ')
+                word_item = ''
                 alpha_blank = True
                 if time_stamp is not None:
                     ts_flag = True
-                    end = time_stamp[i][1]
+                    end = time_stamp[i][1] 
                     ts_lists.append([begin, end])
                     begin = end
+            elif len(ch) == 0:
+                continue
             else:
-                raise ValueError("invalid character: {}".format(ch))
+                continue
+                #raise ValueError('invalid character: {}'.format(ch))
 
-    word_lists, ts_lists = abbr_dispose(word_lists, ts_lists)
-    real_word_lists = []
-    for ch in word_lists:
-        if ch != " ":
-            real_word_lists.append(ch)
-    sentence = " ".join(real_word_lists).strip()
-    return sentence, ts_lists, real_word_lists
+    if time_stamp is not None: 
+        word_lists, ts_lists = abbr_dispose(word_lists, ts_lists)
+        real_word_lists = []
+        for ch in word_lists:
+            if ch != ' ':
+                real_word_lists.append(ch)
+        sentence = ' '.join(real_word_lists).strip()
+        return sentence, ts_lists, real_word_lists
+    else:
+        word_lists = abbr_dispose(word_lists)
+        real_word_lists = []
+        for ch in word_lists:
+            if ch != ' ':
+                real_word_lists.append(ch)
+        sentence = ''.join(word_lists).strip()
+        return sentence, real_word_lists#, is_all_en
+

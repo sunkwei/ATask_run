@@ -11,7 +11,7 @@ import threading
 import logging
 from .model_id import todo2str
 
-logger = logging.getLogger("task")
+# logger = logging.getLogger("asr_runner")
 
 class ATask:
     def __init__(self, todo:int, inpdata:np.ndarray | tuple, userdata:dict):

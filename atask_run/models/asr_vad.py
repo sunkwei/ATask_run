@@ -49,7 +49,7 @@ class Model_asr_vad:
             segs = self.__impl.update(pcm)
         else:
             segs = self.__impl.update(pcm, last=last)
-
+        
         self.__segs.extend(segs)
         return segs
         
@@ -92,7 +92,7 @@ class Model_asr_vad:
             ## 返回 [head, tail) 之间的片段
             self.__asr_next_index = tail
             return (self.__segs[head][0], self.__segs[tail-1][1])
-        elif pcm is None:
+        elif pcm is None or last:
             ## 最后返回剩余片段
             ret = self.__segs[head:]
             self.__asr_next_index = tail

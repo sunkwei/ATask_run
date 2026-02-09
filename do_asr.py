@@ -3,15 +3,31 @@ from typing import cast
 import logging
 import threading
 from atask_run.models.asr_vad import Model_asr_vad
+from atask_run.models.punc_bin import CT_Transformer
 import atask_run.model_id as mid
 from atask_run.apipe import APipe
 from atask_run.atask import ATask
+from atask_run.merge_asr import merge_asr
+from atask_run.seg import seg_asr, alone_merge, find_non_overlapping_intervals, cal_mean_audio
+import time, os
+from atask_run.del_str import opt_punc, get_coincident_area, count_elements_in_list, crop_winds
+from atask_run.feat_cluster import sample_cluster
+from atask_run.scentence_post import ScentencePost
+curr_path = os.path.dirname(os.path.abspath(__file__))
 
-logger = logging.getLogger("asr runner")
+logger = logging.getLogger('asr_runner')
+from logging.handlers import TimedRotatingFileHandler
+
+trfh = TimedRotatingFileHandler(filename=os.path.join(curr_path, "asr_runner.log"), interval=10, when="D", backupCount=1)
+formatter = logging.Formatter(fmt="%(asctime)s %(message)s")
+logger.addHandler(trfh)
+trfh.setFormatter(formatter)
+logger.setLevel(logging.DEBUG)
 
 class ASRRunner:
     def __init__(self, pipe=None, batch_size:int=1, debug=False):
-        self.batch_size = batch_size
+        # ASR 模型不使用批次
+        self.batch_size = 1   #batch_size
         self.debug = debug
         self.__cached_pcm = np.empty((0, ), np.float32)
         self.__stamp_ms_cached_pcm = 0
@@ -19,7 +35,11 @@ class ASRRunner:
         self.thr_db_thresh = 0.003
         self.__cached_pcm_next_vad = 0  ## 保留下一段需要提交给 vad 的位置，相对 self.__cached_pcm 偏移
         self.__V = Model_asr_vad("./model/asr_vad/asr_vad.onnx")
-        self.__mod_mask = mid.DO_ASR_ENCODE | mid.DO_ASR_PREDICTOR | mid.DO_ASR_DECODE | mid.DO_ASR_STAMP | mid.DO_SENSEVOICE
+        self.__PUNC = CT_Transformer(model_dir="./model/punc")
+        self.SP = ScentencePost()
+        self.__mod_mask = mid.DO_ASR_ENCODE | mid.DO_ASR_PREDICTOR | mid.DO_ASR_DECODE \
+                        | mid.DO_ASR_STAMP | mid.DO_SENSEVOICE |mid.DO_VOICEPRINT | mid.DO_4CLS |mid.DO_T5_ENCODER | mid.DO_T5_DEC1ST | mid.DO_T5_DECKVS
+
         if isinstance(pipe, APipe):
             self.__P = cast(APipe, pipe)
             self.__owner = False
@@ -28,11 +48,12 @@ class ASRRunner:
             self.__owner = True
         logger.info(f"ASRRunner: mod_mask={self.__mod_mask:b}, pipe={self.__P}")
 
+    
     def __del__(self):
         del self.__V
         if self.__owner:
             del self.__P
-        logger.info(f"ASRRunner: del")
+        logger.info(f"ASRRunner: del\n")
         
     def update_stream(self, pcm:np.ndarray, last:bool=False) -> list:
         '''
@@ -96,65 +117,44 @@ class ASRRunner:
             f"duration:{len(pcm)/16000:.03f} seconds"
         )
         batch_size = self.batch_size
-        results = []
+        results_para = []
+        results_sensevoice = []
 
-        def wait_proc(pipe:APipe, rs:list):
+        def wait_proc(pipe:APipe, rs:list, rs_sensevoice:list):
             while 1:
                 task = pipe.wait()
-                if not task.userdata.get("batch", False):
+                if 1:
                     r = {
+                        "timestamp": task.data["asr_dec_stamp"][0],
+                        "raw_tokens": task.data["asr_dec_raw_tokens"][0],
+                        "preds": task.data["asr_dec_preds"][0],
+                        "idx": task.userdata["idx"],
                         "begin_ms": task.userdata["begin_ms"],
-                        "end_ms": task.userdata["end_ms"],
-                        "tokens": task.data["asr_dec_token"][0],
-                        "stamps": task.data["asr_dec_stamp"][0],
+                        "asr_type": task.data["asr_type"][0],
+                        "audio_db": task.userdata["audio_db"],
                     }
 
-                    if self.debug:
-                        asr_predictor_infer = task.data["asr_predictor_infer"] #
-                        pre_token_length = asr_predictor_infer[1][0]
-                        r.update({
-                            "asr pre_token_length": pre_token_length,
-                        })
-
                     rs.append(r)
-                else:
-                    ## 批次模式：
-                    for i in range(len(task.userdata["batch_seg_ms"])):
-                        r = {
-                            "begin_ms": task.userdata["batch_seg_ms"][i][0],
-                            "end_ms": task.userdata["batch_seg_ms"][i][1],
-                            "tokens": task.data["asr_dec_token"][i],
-                            "stamps": task.data["asr_dec_stamp"][i],
-                        }
 
-                        if self.debug:
-                            asr_predictor_infer = task.data["asr_predictor_infer"] #
-                            pre_token_length = asr_predictor_infer[1][i]
-                            r.update({
-                                "asr pre_token_length": pre_token_length,
-                            })
+                    r1 = {
+                        "timestamp": task.data["asr_sensevoice_result"][0]["timestamp"],
+                        "raw_tokens": task.data["asr_sensevoice_result"][0]["raw_tokens"],
+                        "preds": task.data["asr_sensevoice_result"][0]["preds"],
+                    }
 
-                        rs.append(r)
+                    rs_sensevoice.append(r1)
 
                 if len(rs) == task.userdata["total"]:
                     break
             return None
 
-        def cal_mean_audio(audio):
-            if len(audio) > 100:
-                audio_up = audio[audio>0]
-                sort_d = np.sort(audio_up)
-                keep = sort_d[-int(len(sort_d) * 0.1):]
-                if len(keep) == 0:
-                    return 0.0001
-                return float(round(np.mean(keep),5)) + 0.0001
-            else:
-                return 0.0001
-        
-        th = threading.Thread(target=wait_proc, args=(self.__P, results))
+        th = threading.Thread(target=wait_proc, args=(self.__P, results_para, results_sensevoice))
         th.start()
 
+        begin_time = time.time()
+        ###########VAD begin!###########
         vad_segs = []
+        audio_db_list = []
         head, tail = 0, len(pcm)
         while head + self.__sample_once_vad <= tail:
             begin_ms, end_ms = self.__V.update_for_asr(pcm[head : head + self.__sample_once_vad])
@@ -162,31 +162,40 @@ class ASRRunner:
                 begin_stamp = 16 * begin_ms; end_stamp = 16 * end_ms
                 pcm_seg = pcm[begin_stamp:end_stamp]
 
-                if cal_mean_audio(pcm_seg) < self.thr_db_thresh:
+                audio_db = cal_mean_audio(pcm_seg)
+                if audio_db < self.thr_db_thresh:
                     continue
 
                 vad_segs.append((begin_ms, end_ms))
-            head += self.__sample_once_vad
+                audio_db_list.append(audio_db)
 
+            head += self.__sample_once_vad
+        
         if head < tail:
             begin_ms, end_ms = self.__V.update_for_asr(pcm[head:], last=True)
             if begin_ms >= 0:
                 begin_stamp = 16 * begin_ms; end_stamp = 16 * end_ms
                 pcm_seg = pcm[begin_stamp:end_stamp]
 
-                if cal_mean_audio(pcm_seg) >= self.thr_db_thresh:
+                audio_db = cal_mean_audio(pcm_seg)
+                if audio_db >= self.thr_db_thresh:
                     vad_segs.append((begin_ms, end_ms))
+                    audio_db_list.append(audio_db)
         
-        logger.debug(f"{self.__class__.__name__}: update_file: GOT {len(vad_segs)} segs, vad_segs={vad_segs}")
+        vad_time = time.time()
+        ########### VAD end! ###########
+        logger.debug(f"{self.__class__.__name__}: update_file: GOT {len(vad_segs)} segs")
+        logger.debug(f"update_file: vad time cost: {vad_time-begin_time:.03f} seconds")
 
+        ########### ASR begin! ###########
         if batch_size == 1:
             for i, (begin_ms, end_ms) in enumerate(vad_segs):
                 begin_sample = 16 * begin_ms; end_sample = 16 * end_ms
                 pcm_seg = pcm[begin_sample:end_sample]
                 task = ATask(
-                    self.__mod_mask,
+                    mid.DO_ASR_ENCODE | mid.DO_ASR_PREDICTOR | mid.DO_ASR_DECODE | mid.DO_ASR_STAMP | mid.DO_SENSEVOICE,
                     pcm_seg,
-                    userdata={"begin_ms": begin_ms, "end_ms": end_ms, "total": len(vad_segs)}
+                    userdata={"begin_ms": begin_ms, "end_ms": end_ms, "total": len(vad_segs), "idx":i, "audio_db": audio_db_list[i]}
                 )
                 self.__P.post_task(task)
         else:
@@ -198,55 +207,222 @@ class ASRRunner:
                 buckets[bucket_idx].append(i)
 
             buckets = buckets[::-1]     ## 反序，防止慢慢增大
-        
-        for begin_ms, end_ms in vad_segs:
-            begin_stamp = 16 * begin_ms; end_stamp = 16 * end_ms
-            pcm_seg = pcm[begin_stamp:end_stamp]
-
-            task = ATask(
-                self.__mod_mask, 
-                pcm_seg, 
-                userdata={"begin_ms": begin_ms, "end_ms": end_ms, "total": len(vad_segs)}
-            )
-            self.__P.post_task(task)
             
         th.join()
+        ########### ASR end! ###########
+        asr_time = time.time()
+        logger.debug(f"update_file: asr time cost: {asr_time-vad_time:.03f} seconds")
 
-        ## XXX: results 必须重新排序
-        results.sort(key=lambda x: x["begin_ms"])
+        # 双asr文本内容合并策略
+        time_list_all, txt_list, crop_punc = merge_asr(results_para, results_sensevoice)
 
-        if self.debug:
-            fname = f"batch_{batch_size}_debug.txt"
-            with open(fname, "w") as f:
-                for r in results:
-                    text = ''.join(r['tokens'])
-                    f.write(f"{r['begin_ms']}\t{r['end_ms']}, pre_token_len:{r['asr pre_token_length']}, txt: {text}'\n")
-            logger.warning(f"{fname} saved!!!!")
+        # 文本切割小片段
+        TT_single, group_dex, crop_time_list = seg_asr(pcm, txt_list, time_list_all)
 
-        if self.debug:
-            for rs in results:
-                txt = ''.join(rs['tokens'])
-                logger.info(f"    GOT vad seg: {rs['begin_ms']}-{rs['end_ms']}, txt:{txt}, pcm:{rs['pcm']}")
+        seg_asr_time = time.time()
+        logger.debug(f"seg_asr time cost: {seg_asr_time-asr_time:.03f} seconds")
 
-        return results
+        ##########声纹############
+        FF = []
+        def wait_sv(pipe:APipe, F:np.ndarray):
+            while 1:
+                task = pipe.wait()
+                sv_feats = task.data["sv_feat"][0]
+                F.append(sv_feats)
+                
+                if len(F) == task.userdata["total"]:
+                    break
+            return None
+        
+        th = threading.Thread(target=wait_sv, args=(self.__P, FF))
+        th.start()
+
+        for i in range(len(TT_single)):
+            s = TT_single[i][0]
+            e = TT_single[i][1]
+            part_wav = pcm[int(s*16000):int(e*16000)]
+            task = ATask(
+                    mid.DO_VOICEPRINT,
+                    part_wav,
+                    userdata={"total": len(TT_single)}
+                )
+            self.__P.post_task(task)
+
+        ########## 等待声纹结果时，进行标点预测 ############
+        if len(txt_list) == 0:
+            punc = []
+        else:
+            result_punc = self.__PUNC(" ".join(txt_list))
+            punc = result_punc[1]
+            if len(punc) >= 3:
+                punc = opt_punc(txt_list, punc, crop_time_list)
+        
+            if len(crop_punc) > 0:
+                punc = np.array(punc)
+                for c in crop_punc:
+                    punc[c[0] + 1:c[1]] = 1
+                    if punc[c[0]] == 1:
+                        punc[c[0]] = 2
+                    if punc[c[1]] == 1:
+                        punc[c[1]] = 2
+        punc_time = time.time()
+        logger.debug(f"punc time cost: {punc_time-seg_asr_time:.03f} seconds")
+
+        th.join()
+        sv_time = time.time()
+        logger.debug(f"sv & punc time cost: {sv_time-seg_asr_time:.03f} seconds")
+
+        ########### 声纹、标点预测结束 ############
+        FF_single = np.array(FF)
+
+        # 处理单字，前后合并
+        rm_dex_alone = alone_merge(TT_single, FF_single, group_dex)
+        # 从数据里删除被合并的单字的数据
+        TT_single = np.delete(TT_single, rm_dex_alone, axis=0)
+        FF_single = np.delete(FF_single, rm_dex_alone, axis=0)
+
+        ########## 预测四分类 ############
+        main_interval = np.array([0, len(pcm) / 16000])
+        no_single_time = find_non_overlapping_intervals(main_interval, TT_single)
+
+        v4_results = []
+        v4_td = []
+        def wait_v4(pipe:APipe, r:list, td:list):
+            while 1:
+                task = pipe.wait()
+                r.append(task.data["v4_infer"])
+                td.append(task.data["td"])
+                
+                if len(r) == task.userdata["total"]:
+                    break
+            return None
+        
+        th = threading.Thread(target=wait_v4, args=(self.__P, v4_results, v4_td))
+        th.start()
+
+        for i in range(len(TT_single)):
+            s = TT_single[i][0]
+            e = TT_single[i][1]
+            part_wav = pcm[int(s*16000):int(e*16000)]
+            task = ATask(
+                    mid.DO_4CLS,
+                    part_wav,
+                    userdata={"prefix": "single", "total": len(TT_single) + len(no_single_time)}
+                )
+            self.__P.post_task(task)
+
+        for i in range(len(no_single_time)):
+            s = no_single_time[i][0]
+            e = no_single_time[i][1]
+            part_wav = pcm[int(s*16000):int(e*16000)]
+            task = ATask(
+                    mid.DO_4CLS,
+                    part_wav,
+                    userdata={"prefix": "no_single", "total": len(TT_single) + len(no_single_time)}
+                )
+            self.__P.post_task(task)
+        
+        ########## 等待v4结果时，进行声纹聚类 ############
+        ########### 对人声片段的声纹特征聚类,确定老师类 ############
+        if len(FF_single) > 0:
+            LL_O = sample_cluster(FF_single, TT_single, no_single_time) 
+            LL_O = LL_O.astype(int)
+        else:
+            LL_O = []
+
+        role_data = np.array([])
+        scentence_data = {'data': [], 'statistics': {}}
+        if len(LL_O) > 0:
+            role_data = np.hstack((TT_single, np.array([LL_O]).T))
+            ############ 每个字标注角色 ############
+            txt_label = []
+            last_label = -1
+            for i in range(len(crop_time_list)):
+                time_t = np.array([crop_time_list[i][0], crop_time_list[i][1]])
+                area_list = get_coincident_area(time_t, role_data)
+                curr_label = int(role_data[np.argmax(area_list), -1])
+
+                if txt_list[i] in self.SP.first_rm and curr_label != last_label:
+                    # 结束的语气词不能是一个新角色的开始
+                    # 一句话的结束字不能是一个新角色的开始
+                    curr_label = last_label
+
+                txt_label.append(curr_label)
+
+                last_label = curr_label
+
+            ############# 统计口头禅 ############
+            mantra_data = count_elements_in_list(txt_list, self.SP.mantra)  # 统计口头禅
+
+            ############# 对于停顿大的，尝试增加断句 ############
+            crop_thresh = 1
+            split_dex = crop_winds(crop_time_list, txt_list, crop_thresh=crop_thresh)
+            
+            # ############ 进行句子后处理（断句、情绪、itn）############
+            scentence_data = self.SP(txt_list, crop_time_list, punc, split_dex, txt_label, mantra_data)
+            
+        th.join()
+        v4_scentence_time = time.time()
+        logger.debug(f"v4 & cluster & scentence_post time cost: {v4_scentence_time-sv_time:.03f} seconds")
+
+        ########## 对纯英文句子英译汉 #########
+        tr_num = 0
+        for dex, data in enumerate(scentence_data["data"]):
+            if len(data["translation"]) > 0:
+                # 如果是纯英文句子，则进行翻译
+                task = ATask(
+                    mid.DO_T5_ENCODER | mid.DO_T5_DEC1ST | mid.DO_T5_DECKVS,
+                    data["translation"],
+                    userdata={"dex": dex}
+                )
+                self.__P.post_task(task)
+                tr_num += 1
+
+        trans_results = {}
+        def wait_trans(pipe:APipe, tr:dict, num:int):
+            while 1:
+                task = pipe.wait()
+                tr[task.userdata["dex"]] = task.data["trans_post"]
+
+                if len(tr) == num:
+                    break
+            return None
+        
+        if tr_num > 0:
+            th = threading.Thread(target=wait_trans, args=(self.__P, trans_results, tr_num))
+            th.start()
+
+            th.join()
+            for k in trans_results:
+                scentence_data["data"][k]["translation"] = trans_results[k]
+
+            t5_time = time.time()
+            logger.debug(f"t5 time cost: {t5_time-v4_scentence_time:.03f} seconds")
+
+        logger.debug(f"all time cost: {time.time()-begin_time:.03f} seconds")
+        return scentence_data
     
     def __do_asr(self, begin_ms, end_ms, pcm=None) -> dict:
+        # 记录调试信息：开始时间、结束时间和缓存音频范围
         logger.debug("__do_asr: begin_ms:{}, end_ms:{}, cache_samples from {} to {}".format(
             begin_ms, end_ms, self.__stamp_ms_cached_pcm, len(self.__cached_pcm) / 16 + self.__stamp_ms_cached_pcm
         ))
+        # 如果未提供音频数据，则从缓存中提取指定时间段的音频
         if pcm is None:
-            begin_samples = 16 * (begin_ms - self.__stamp_ms_cached_pcm)
-            end_samples = 16 * (end_ms - self.__stamp_ms_cached_pcm)
-            assert end_samples <= len(self.__cached_pcm)
-            pcm = self.__cached_pcm[begin_samples:end_samples]
+            begin_samples = 16 * (begin_ms - self.__stamp_ms_cached_pcm)  # 转换为样本数
+            end_samples = 16 * (end_ms - self.__stamp_ms_cached_pcm)      # 转换为样本数
+            assert end_samples <= len(self.__cached_pcm)  # 确保请求的样本数不超过缓存长度
+            pcm = self.__cached_pcm[begin_samples:end_samples]  # 从缓存中提取音频段
+        # 创建ASR任务并提交到管道
         task = ATask(self.__mod_mask, pcm, userdata={})
-        self.__P.post_task(task)
-        task.wait()
+        self.__P.post_task(task)  # 提交任务到处理管道
+        task.wait()  # 等待任务完成
+        # 构建并返回结果字典，包含时间戳、识别文本和对应的时间戳信息
         rs = {
             "begin_ms": begin_ms,
             "end_ms": end_ms,
-            "tokens": task.data["asr_dec_token"][0],
-            "stamps": [(s[0] + begin_ms, s[1] + begin_ms) for s in task.data["asr_dec_stamp"][0]]
+            "tokens": task.data["asr_dec_token"][0],  # 识别的文本token
+            "stamps": [(s[0] + begin_ms, s[1] + begin_ms) for s in task.data["asr_dec_stamp"][0]]  # 相对时间戳转换为绝对时间戳
         }
 
         return rs

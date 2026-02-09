@@ -1,1 +1,5 @@
-该目录存储所有模型的加载配置
+配置模板目录：
+
+    python test.py --build_model_config
+
+将在该目录中生成默认配置

@@ -38,7 +38,7 @@ import os.path as osp
 import yaml
 import logging
 
-logger = logging.getLogger("pipe")
+logger = logging.getLogger("asr_runner")
 
 class APipe:
     def __init__(
@@ -92,7 +92,7 @@ class APipe:
             E_pre_num_thread = 1
 
         logger.info(f"APipe: debug:{debug} cfg: Q_inp_size:{Q_inp_size}, E_pre_num_thread:{E_pre_num_thread}, E_infer_num_thread:{E_infer_num_thread}, E_post_num_thread:{E_post_num_thread}")
-
+        
         self.__supported_todo = 0
         self.__model_desc = load_model_config(model_config_path, model_mask)
         if not self.__model_desc:
@@ -122,7 +122,7 @@ class APipe:
         self.E_infer = AExecutor(
             "infer", find_model, 
             self.Q_pre, self.Q_infer, 
-            E_infer_num_thread,
+            3,
             debug=self.debug,
         )
         self.E_post = AExecutor(
@@ -142,8 +142,8 @@ class APipe:
         self.E_post.close()
 
     def __repr__(self):
-        info = f"<APipe> ins={id(self)}, enable model:{self.__supported_todo:b}\n"
-        info += f"    Q_inp:{self.Q_inp.qsize()}, Q_pre:{self.Q_pre.qsize()}, Q_infer:{self.Q_infer.qsize()}, Q_result:{self.Q_result.qsize()}, Q_sub:{self.Q_inp_sub.qsize()}\n"
+        info = f"<APipe> ins={id(self)}, enable model:{self.__supported_todo:b}"
+        # info += f"    Q_inp:{self.Q_inp.qsize()}, Q_pre:{self.Q_pre.qsize()}, Q_infer:{self.Q_infer.qsize()}, Q_result:{self.Q_result.qsize()}, Q_sub:{self.Q_inp_sub.qsize()}\n"
         return info
         
     def post_task(self, task:ATask):
@@ -155,7 +155,7 @@ class APipe:
             logger.error(f"unsupported todo {task.todo:b} vs {self.__supported_todo:b}")
             raise Exception("unsupported todo")
         
-        logger.debug("APipe: pending: {}".format(self.get_qsize()))
+        # logger.debug("APipe: pending: {}".format(self.get_qsize()))
         self.Q_inp.put(task)
 
     def wait(self) -> ATask:
@@ -210,6 +210,7 @@ class APipe:
             cls = getattr(module, f"Model_{name}")
             model = cls(**cfg)
             logger.info(f"APipe: load_models: load {name} success, {model}")
+            print (f"Load {name} success")
             models.append((mid, model))
 
         return models

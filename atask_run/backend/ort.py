@@ -42,10 +42,10 @@ class OnnxruntimeBackend(AModelBackend):
 
     def __repr__(self) -> str:
         info = f"OrtBackend: model:{self.model_path} P:{self.__curr_p}, with inputs({len(self.input_names)}) outputs({len(self.output_names)})"
-        for i, name in enumerate(self.input_names):
-            info += f"\n\tinput[{i}] {name}: shape={self.get_input_shape(i)}"
-        for i, name in enumerate(self.output_names):
-            info += f"\n\toutput[{i}] {name}: shape={self.get_output_shape(i)}"
+        # for i, name in enumerate(self.input_names):
+        #     info += f"\n\tinput[{i}] {name}: shape={self.get_input_shape(i)}"
+        # for i, name in enumerate(self.output_names):
+        #     info += f"\n\toutput[{i}] {name}: shape={self.get_output_shape(i)}"
         return info
 
     def teardown(self):

@@ -1,0 +1,409 @@
+# coding: utf-8
+'''
+用于把语音识别出的中文数字转为阿拉伯数字形式，
+使用正则表达式进行匹配和替换，
+可能不是那么精准，但足够应付大部分情景了。
+
+用法示例：
+
+from chinese_itn import chinese_to_num
+
+res = chinese_to_num('幺九二点幺六八点幺点幺')  
+print(res)  # 192.168.1.1
+
+'''
+
+__all__ = ['chinese_to_num']
+
+import re
+from string import ascii_letters
+import os
+WORK_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# 常见的跟在数字后面的单位
+common_units = r'个只分万亿秒天个件本张条匹头匹辆架艘座栋扇台部首篇'       
+
+# idioms:成语、日常短语，用于避免误转
+with open(WORK_DIR + '/idioms.txt', 'r', encoding='utf-8') as f:
+    data = f.readlines()
+
+idioms = []
+for l in data:
+    l = l.strip()
+    idioms.append(l)
+
+# 总模式，筛选出可能需要替换的内容
+# 测试链接  https://regex101.com/r/tFqg9S/3
+pattern = re.compile(f"""(?ix)          # i 表示忽略大小写，x 表示开启注释模式
+([a-z]\s*)?
+(
+  ( 
+    [零幺一二两三四五六七八九十百千万点比]
+    |[零一二三四五六七八九十][ ]
+    
+    |(?<=[一二两三四五六七八九十])[年月日号分]
+    |(分之)
+    
+  )+
+  (
+    (?<=[一二两三四五六七八九十])[a-zA-Z年月日号{common_units}]
+    |(?<=[一二两三四五六七八九十]\s)[a-zA-Z]
+  )?
+  (?(1)
+  |(?(5)
+    |(
+      [零幺一二两三四五六七八九十百千万亿点比]
+      |(分之)
+      |(加)
+      |(减)
+      |(乘)
+      |(除)
+      |(等于)
+    )
+  )+
+  )
+)
+
+""")
+
+
+# 细分匹配不同的数字类型
+
+# 纯数字序号
+pure_num = re.compile(f'[零幺一二三四五六七八九]+(点[零幺一二三四五六七八九]+)* *[a-zA-Z{common_units}]?')
+
+# 数值
+value_num = re.compile(f"十?(零?[一二两三四五六七八九十][十百千万]{{1,2}})*零?[一二三四五六七八九]?(点[零一二三四五六七八九]+)? *[a-zA-Z{common_units}]?")
+
+# 百分值
+percent_value = re.compile('(?<![一二三四五六七八九])(百分之)[零一二三四五六七八九十百千万]+(点)?(?(2)[零一二三四五六七八九]+)')
+
+# 分数
+fraction_value = re.compile('([零一二三四五六七八九十百千万]+(点)?(?(2)[零一二三四五六七八九]+))分之([零一二三四五六七八九十百千万]+(点)?(?(4)[零一二三四五六七八九]+))')
+
+# 比值
+ratio_value = re.compile('([零一二三四五六七八九十百千万]+(点)?(?(2)[零一二三四五六七八九]+))比([零一二三四五六七八九十百千万]+(点)?(?(4)[零一二三四五六七八九]+))')
+
+# 度数
+# tm_value = re.compile('([零一二三四五六七八九十百千万]+(点)?(?(2)[零一二三四五六七八九]+))度([零一二三四五六七八九十百千万]+(点)?(?(4)[零一二三四五六七八九]+))')
+
+# # 加运算
+# add_value = re.compile('([零一二三四五六七八九十百千万]+(点)?(?(2)[零一二三四五六七八九]+))加([零一二三四五六七八九十百千万]+(点)?(?(4)[零一二三四五六七八九]+))')
+
+# # 减运算
+# subtract_value = re.compile('([零一二三四五六七八九十百千万]+(点)?(?(2)[零一二三四五六七八九]+))减([零一二三四五六七八九十百千万]+(点)?(?(4)[零一二三四五六七八九]+))')
+
+# # 乘运算
+# mult_value = re.compile('([零一二三四五六七八九十百千万]+(点)?(?(2)[零一二三四五六七八九]+))乘([零一二三四五六七八九十百千万]+(点)?(?(4)[零一二三四五六七八九]+))')
+
+# # 除运算
+# division_value = re.compile('([零一二三四五六七八九十百千万]+(点)?(?(2)[零一二三四五六七八九]+))除([零一二三四五六七八九十百千万]+(点)?(?(4)[零一二三四五六七八九]+))')
+
+# # 等于运算
+# equal_value = re.compile('([零一二三四五六七八九十百千万]+(点)?(?(2)[零一二三四五六七八九]+))等于([零一二三四五六七八九十百千万]+(点)?(?(4)[零一二三四五六七八九]+))')
+
+# 加减乘除等于运算
+complex_value = re.compile(
+    r'([零一二三四五六七八九十百千万点]+)' +
+    r'((加|减|乘|除|等于)[零一二三四五六七八九十百千万点]+)+'
+)
+# 时间
+time_value = re.compile("[零一二三四五六七八九十]+点([零一二三四五六七八九十]+分)([零一二三四五六七八九十]+秒)?")
+
+# 日期
+data_value = re.compile("""(?ix)          # i 表示忽略大小写，x 表示开启注释模式
+([零一二三四五六七八九]+年)([一二三四五六七八九十]+月([一二三四五六七八九十]+[日号]))|
+(([零一二三四五六七八九]+年)([一二三四五六七八九十]+月))|
+([一二三四五六七八九十]+月([一二三四五六七八九十]+[日号]))|
+([零一二三四五六七八九]+年)
+""")
+
+# 中文数字对阿拉伯数字的映射
+num_mapper = {
+    '零': '0', 
+    '一': '1', 
+    '幺': '1', 
+    '二': '2', 
+    '两': '2', 
+    '三': '3', 
+    '四': '4', 
+    '五': '5', 
+    '六': '6', 
+    '七': '7', 
+    '八': '8', 
+    '九': '9', 
+    '点': '.', 
+}
+
+# 中文数字对数值的映射
+value_mapper = {
+    '零': 0, 
+    '一': 1, 
+    '二': 2, 
+    '两': 2, 
+    '三': 3, 
+    '四': 4, 
+    '五': 5, 
+    '六': 6, 
+    '七': 7, 
+    '八': 8, 
+    '九': 9, 
+    "十": 10,
+    "百": 100,
+    "千": 1000,
+    "万": 10000,
+}
+
+
+def strip_unit(original):
+    '''把数字后面跟着的单位剥离开'''
+    unit = ''       
+    stripped = original.strip(common_units + ascii_letters).strip()
+    if stripped != original: 
+        unit = original[len(stripped):]
+    return stripped, unit
+
+def convert_pure_num(original, strict=False):
+    '''把中文数字转为对应的阿拉伯数字'''
+    stripped, unit = strip_unit(original)
+    if stripped in ['一'] and not strict:
+        return original
+    
+    # if len(set(stripped) - set('一二两三四五六七八九')) == 0:
+    #     return original
+    
+    converted = []
+    for c in stripped:
+        converted.append(num_mapper[c])
+    final = ''.join(converted) + unit
+    return final
+
+def convert_value_num(original):
+    '''把中文数值转为阿拉伯数字'''
+    stripped, unit = strip_unit(original)   # 剥除单位
+    if '点' not in stripped: stripped += '点'
+    int_part, decimal_part = stripped.split("点")   # 分离小数
+    if not int_part: return original        # 如果没有整数部分，表面匹配到的是「点一」这样的形式，应当不处理
+
+    # 计算整数部分的值
+    value, temp, base = 0, 0, 1
+    last_c = ""
+    for c in int_part:
+        if c == last_c:
+            continue
+
+        if c == '十' : 
+            temp = 10 if temp==0 else value_mapper[c]*temp
+            base = 1
+        elif c == '零':
+            base = 1
+        elif c in '一二两三四五六七八九':
+            temp += value_mapper[c]
+        elif c in '万':
+            value += temp 
+            value *= value_mapper[c]
+            base = value_mapper[c] // 10
+            temp = 0
+        elif c in '百千':
+            value += temp * value_mapper[c]
+            base = value_mapper[c] // 10
+            temp = 0
+        
+        last_c = c
+    value += temp * base; 
+    final = str(value)
+    
+    # 小数部分，就是纯数字，直接映射即可
+    decimal_str = convert_pure_num(decimal_part, strict=True)
+    if decimal_str: final += '.' + decimal_str
+    final += unit
+    
+    return final
+
+def convert_tmp_value(original):
+    denominator, numerator = original.split('度')
+    if pure_num.fullmatch(denominator):
+        denominator = convert_pure_num(denominator, strict=True)
+    else:
+        denominator = convert_value_num(denominator)
+
+    if pure_num.fullmatch(numerator):
+        numerator = convert_pure_num(numerator, strict=True)
+    else:
+        numerator = convert_value_num(numerator)
+    final = denominator + '.' + numerator + '°'
+    return final
+
+def convert_add_value(original):
+    denominator, numerator = original.split('加')
+    final = convert_value_num(denominator) + '+' + convert_value_num(numerator)
+    return final
+
+def convert_subtract_value(original):
+    denominator, numerator = original.split('减')
+    final = convert_value_num(denominator) + '-' + convert_value_num(numerator)
+    return final
+
+def convert_mult_value(original):
+    denominator, numerator = original.split('乘')
+    final = convert_value_num(denominator) + '*' + convert_value_num(numerator)
+    return final
+
+def convert_division_value(original):
+    denominator, numerator = original.split('除')
+    final = convert_value_num(denominator) + '÷' + convert_value_num(numerator)
+    return final
+
+def convert_complex_expression(original):
+    """转换复合运算表达式"""
+    # 分割运算表达式
+    parts = re.split(r'(加|减|乘|除|等于)', original)
+    
+    result = []
+    for i, part in enumerate(parts):
+        if i % 2 == 0:  # 数字部分
+            if pure_num.fullmatch(part):
+                converted = convert_pure_num(part, strict=True)
+            else:
+                converted = convert_value_num(part)
+                
+            # 尝试用value_num转换，失败则用pure_num
+            # try:
+            #     converted = convert_value_num(part)
+            # except:
+
+            result.append(converted)
+        else:  # 运算符部分
+            # 转换运算符
+            op_map = {'加': '+', '减': '-', '乘': '*', '除': '÷', '等于': '='}
+            result.append(op_map.get(part, part))
+    
+    return ''.join(result)
+
+def convert_equal_value(original):
+    denominator, numerator = original.split('等于')
+    final = convert_value_num(denominator) + '=' + convert_value_num(numerator)
+    return final
+
+def convert_fraction_value(original):
+    denominator, numerator = original.split('分之')
+    final = convert_value_num(numerator) + '/' + convert_value_num(denominator)
+    return final
+
+def convert_percent_value(original):
+    final = convert_value_num(original[3:]) + '%'
+    return final
+
+def convert_ratio_value(original):
+    num1, num2 = original.split("比")
+    final = convert_value_num(num1) + ':' + convert_value_num(num2)
+    return final
+
+def convert_time_value(original):
+    res = [x for x in re.split('[点分秒]', original) if x]
+    final = ''
+    final += convert_value_num(res[0])
+    final += ':' + convert_value_num(res[1])
+    if len(res) > 2: 
+        final += ':' + convert_value_num(res[2])
+    if len(res) > 3: 
+        final += '.' + convert_pure_num(res[3])
+    return final
+    ...
+
+def convert_date_value(original):
+    final = ''
+    if '年' in original:
+        year, original = original.split('年')
+        final += convert_pure_num(year) + '年'
+    if '月' in original:
+        month, original = original.split('月')
+        final += convert_value_num(month) + '月'
+    if '日' in original:
+        day, original = original.split('日')
+        final += convert_value_num(day) + '日'
+    elif '号' in original:
+        day, original = original.split('号')
+        final += convert_value_num(day) + '号'
+    return final
+    ...
+
+
+def replace(original):
+    string = original.string
+    l_pos, r_pos = original.regs[2]; l_pos = max(l_pos-2, 0)
+    head = original.group(1)
+    original = original.group(2)
+    try:
+        if idioms and any([string.find(idiom) in range(l_pos, r_pos) for idiom in idioms]):
+            final = original
+        elif pure_num.fullmatch(original.strip(common_units)):
+            num_type = '纯数字'
+            final = convert_pure_num(original)
+        elif value_num.fullmatch(original.strip(common_units)):
+            num_type = '数值'
+            final = convert_value_num(original)
+        elif percent_value.fullmatch(original):
+            num_type = '百分之数值'
+            final = convert_percent_value(original)
+        elif fraction_value.fullmatch(original):
+            num_type = '分数'
+            final = convert_fraction_value(original)
+        # elif tm_value.fullmatch(original):
+        #     num_type = '度数'
+        #     final = convert_tmp_value(original)
+        elif ratio_value.fullmatch(original):
+            num_type = '比值'
+            final = convert_ratio_value(original)
+        elif complex_value.fullmatch(original):
+            num_type = '复合运算'
+            final = convert_complex_expression(original)
+        elif time_value.fullmatch(original):
+            num_type = '时间'
+            final = convert_time_value(original)
+        elif data_value.fullmatch(original):
+            num_type = '日期'
+            final = convert_date_value(original)
+        else:
+            final = original
+
+        if head:
+            final = head + final
+    except:
+        num_type = '未知'
+        final = original
+    return final
+
+
+def chinese_to_num(original):
+    return pattern.sub(replace, original)
+
+if __name__ == "__main__":
+
+    # groups = []
+    # with open('./old/测试集.txt', 'r', encoding="utf-8", newline='') as f:
+    #     lines = f.readlines()
+    #     for i in range(0, len(lines), 5):
+    #         original = lines[i].split(maxsplit=2)[1]
+    #         reult = lines[i+1].split(maxsplit=2)[1]
+    #         groups.append([original, reult])
+
+    # for g in groups:
+    #     original = g[0]
+    #     reference = g[1]
+    #     answer = chinese_to_num(original)
+    #     print(f'\n{original=}')
+    #     print(f'{reference=}') 
+    #     print(f'{answer=   }') 
+
+    # file = './old/汉语词语.txt'
+    # with open(file, 'r', encoding='utf-8') as f:
+    #     words = f.readlines()
+
+    # for word in words: 
+    #     new = chinese_to_num(word)
+    #     if re.match(r'.*\d.+', new):
+    #         print(word, new)
+    print(chinese_to_num('二零二五年十月'))
+    print(chinese_to_num('乱七八糟'))
+

@@ -17,7 +17,7 @@ from .backend.ort import OnnxruntimeBackend
 import logging
 import numpy as np
 
-logger = logging.getLogger("model")
+logger = logging.getLogger("asr_runner")
 
 class AModel:
     def __init__(
@@ -91,7 +91,7 @@ class AModel:
             self.__backend_impls.append(impl)
 
     def __del__(self):
-        logger.info(f"del {self}")
+        # logger.info(f"del {self}")
         if hasattr(self, '__backend_impls'):
             for impl in self.__backend_impls:
                 impl.teardown()
@@ -134,3 +134,8 @@ class AModel:
     def __call__(self, *args):
         idx = self.__get_impl_id()
         return self.__backend_impls[idx].infer(*args)
+
+    def softmax(self, x):
+        """稳定的softmax实现"""
+        exp_x = np.exp(x - np.max(x))
+        return exp_x / np.sum(exp_x)
