@@ -30,34 +30,30 @@ class TimeUsedItem:
             if self.count == 1:
                 return f"{self.name}: count: {self.count}, " \
                     f"total: {self.total_duration:03f} secs, "\
-                    f"avg:{self.total_duration/self.count:.06f} secs, "\
-                    f"sys mem max:{self.sys_mem_max:.02f}M." \
-                    f"cuda mem max:{self.cuda_mem_max:.02f}M."
-            else:
-                return f"{self.name}: count: {self.count}, " \
-                    f"total: {self.total_duration:03f} secs, "\
-                    f"avg:{self.total_duration/self.count:.06f} secs, "\
-                    f"max:{self.max_duration:.05f} secs, "\
-                    f"min:{self.min_duration:.05f} secs, "\
-                    f"sys mem max:{self.sys_mem_max:.02f}M." \
-                    f"cuda mem max:{self.cuda_mem_max:.02f}M."
-        else:
-            if self.count == 1:                
-                return f"{self.name}: count: {self.count}, " \
-                    f"total: {self.total_duration:03f} secs, "\
                     f"avg:{self.total_duration/self.count:.06f} secs."
-                    # f"sys mem max:{self.sys_mem_max:.02f}M, "\
-                    # f"cuda mem max:{self.cuda_mem_max:.02f}M, "\
-                    # f"avg cpu:{self.cpu_sum/self.cpu_count:.02f}%"
             else:
                 return f"{self.name}: count: {self.count}, " \
                     f"total: {self.total_duration:03f} secs, "\
                     f"avg:{self.total_duration/self.count:.06f} secs, "\
                     f"max:{self.max_duration:.05f} secs, "\
                     f"min:{self.min_duration:.05f} secs."
-                    # f"sys mem max:{self.sys_mem_max:.02f}M, "\
-                    # f"cuda mem max:{self.cuda_mem_max:.02f}M, "\
-                    # f"avg cpu:{self.cpu_sum/self.cpu_count:.02f}%"
+        else:
+            if self.count == 1:                
+                return f"{self.name}: count: {self.count}, " \
+                    f"total: {self.total_duration:03f} secs, "\
+                    f"avg:{self.total_duration/self.count:.06f} secs, "\
+                    f"sys mem max:{self.sys_mem_max:.02f}M, "\
+                    f"cuda mem max:{self.cuda_mem_max:.02f}M, "\
+                    f"avg cpu:{self.cpu_sum/self.cpu_count:.02f}%"
+            else:
+                return f"{self.name}: count: {self.count}, " \
+                    f"total: {self.total_duration:03f} secs, "\
+                    f"avg:{self.total_duration/self.count:.06f} secs, "\
+                    f"max:{self.max_duration:.05f} secs, "\
+                    f"min:{self.min_duration:.05f} secs, "\
+                    f"sys mem max:{self.sys_mem_max:.02f}M, "\
+                    f"cuda mem max:{self.cuda_mem_max:.02f}M, "\
+                    f"avg cpu:{self.cpu_sum/self.cpu_count:.02f}%"
 
 @singleton
 class TimeUsedSum:

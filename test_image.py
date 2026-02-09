@@ -187,7 +187,7 @@ class ImageTestCase(TestCase):
 
                 th.join()
 
-    def __test_images_with_batch(self, batch_size=1):
+    def __test_images_with_batch(self, batch_size=1, profile:bool=False):
         from pathlib import Path
         P = Path("picture")
         fnames = [ str(p) for p in P.glob("*.jpg") ]
@@ -202,7 +202,7 @@ class ImageTestCase(TestCase):
             mid.DO_FACEORI | \
             0
         
-        with APipeWrap(todo0, profile=True) as pipe:
+        with APipeWrap(todo0, profile=profile) as pipe:
             def wait_proc():
                 count = 0
                 act_count = 0
@@ -241,10 +241,10 @@ class ImageTestCase(TestCase):
                 th.join()   ## 等待所有任务完成
 
     def test_images(self):
-        # self.__test_images_with_batch(batch_size=1)
-        # self.__test_images_with_batch(batch_size=2)
-        # self.__test_images_with_batch(batch_size=4)
-        # self.__test_images_with_batch(batch_size=8)
+        self.__test_images_with_batch(batch_size=1)
+        self.__test_images_with_batch(batch_size=2, profile=True)
+        self.__test_images_with_batch(batch_size=4)
+        self.__test_images_with_batch(batch_size=8)
         self.__test_images_with_batch(batch_size=16)
 
 if __name__ == "__main__":
