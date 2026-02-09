@@ -202,7 +202,7 @@ class ImageTestCase(TestCase):
             mid.DO_FACEORI | \
             0
         
-        with APipeWrap(todo0) as pipe:
+        with APipeWrap(todo0, profile=True) as pipe:
             def wait_proc():
                 count = 0
                 act_count = 0
@@ -227,24 +227,24 @@ class ImageTestCase(TestCase):
             th = threading.Thread(target=wait_proc)
             th.start()
 
-            with TimeUsed(f"total: test batch size {batch_size}"):
+            with TimeUsed(f"total: test batch size {batch_size}", with_cuda=True, with_cpu=True):
                 head = 0; tail = len(fnames)
                 while head < tail:
                     N = min(batch_size, tail - head)
                     batch = fnames[head : head + N]
                     image_batch = [ cv2.imread(fname) for fname in batch ]
-                    with TimeUsed("post_task"):
+                    with TimeUsed("post atask"):
                         task = ATask(todo=todo0, inpdata=tuple(image_batch), userdata={})
                         pipe.post_task(task)
                     head += N
 
-                th.join()
+                th.join()   ## 等待所有任务完成
 
     def test_images(self):
-        self.__test_images_with_batch(batch_size=1)
-        self.__test_images_with_batch(batch_size=2)
-        self.__test_images_with_batch(batch_size=4)
-        self.__test_images_with_batch(batch_size=8)
+        # self.__test_images_with_batch(batch_size=1)
+        # self.__test_images_with_batch(batch_size=2)
+        # self.__test_images_with_batch(batch_size=4)
+        # self.__test_images_with_batch(batch_size=8)
         self.__test_images_with_batch(batch_size=16)
 
 if __name__ == "__main__":

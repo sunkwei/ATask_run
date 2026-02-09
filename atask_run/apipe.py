@@ -50,8 +50,10 @@ class APipe:
         model_mask: int=-1,         ## 启用的模型 bitmask，默认启用所有
         model_config_path: str="./config",
         debug: bool=False,
+        profile: bool=False,
     ):
         self.debug = debug
+        self.profile = profile
 
         Q_inp_sub_size = Q_infer_size = Q_result_size = -1
         Q_pre_size = Q_inp_size * 5
@@ -118,12 +120,14 @@ class APipe:
             E_pre_num_thread,
             sub_q = self.Q_inp_sub,
             debug=self.debug,
+            profile=self.profile,
         )
         self.E_infer = AExecutor(
             "infer", find_model, 
             self.Q_pre, self.Q_infer, 
             E_infer_num_thread,
             debug=self.debug,
+            profile=self.profile,
         )
         self.E_post = AExecutor(
             "post", find_model, 
@@ -131,6 +135,7 @@ class APipe:
             E_post_num_thread, 
             result_q=self.Q_result,
             debug=self.debug,
+            profile=self.profile,
         )
 
         ## 根据配置的模型，加载所有模型
@@ -235,12 +240,13 @@ class APipe:
 
 
 class APipeWrap:
-    def __init__(self, model_mask: int=-1, debug:bool=False):
+    def __init__(self, model_mask: int=-1, debug:bool=False, profile:bool=False):
         self.__model_mask = model_mask
         self.__debug = debug
+        self.__profile = profile
 
     def __enter__(self):
-        self.__pipe = APipe(model_mask=self.__model_mask, debug=self.__debug)
+        self.__pipe = APipe(model_mask=self.__model_mask, debug=self.__debug, profile=self.__profile)
         return self.__pipe
 
     def __exit__(self, exc_type, exc_value, traceback):
