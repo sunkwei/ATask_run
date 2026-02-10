@@ -121,10 +121,41 @@ def find_non_overlapping_intervals(main_interval, sub_intervals):
     if last_end < end:
         non_overlapping.append([last_end, end])
 
-    # 过滤掉空区间（如果有）  
+    # # 过滤掉空区间以及切割，保证最长区间不超过5秒,否则切割
+    # no_single_time = []
+    # for start, end in non_overlapping:
+    #     if start >= end:
+    #         continue
+
+    #     if end - start <= 5:
+    #         no_single_time.append([start, end])
+    #     else:
+    #         while start + 5 < end:
+    #             no_single_time.append([start, start+5])
+    #             start += 5
+
+    #         no_single_time.append([no_single_time[-1][1], end])
+
     non_overlapping = [[start, end] for start, end in non_overlapping if start < end]
 
     return non_overlapping
+
+def cut_long_seg(non_overlapping):
+    no_single_time = []
+    for start, end in non_overlapping:
+        if start >= end:
+            continue
+
+        if end - start <= 5:
+            no_single_time.append([start, end])
+        else:
+            while start + 5 < end:
+                no_single_time.append([start, start+5])
+                start += 5
+
+            no_single_time.append([no_single_time[-1][1], end])
+    
+    return no_single_time
 
 def cal_mean_audio(audio):
     if len(audio) > 100:

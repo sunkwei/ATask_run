@@ -34,9 +34,6 @@ class Model_v4(AModel):
             task.data["v4_infer"] = []
             task.data["td"] = []
         
-        elif task.userdata["prefix"] == "single":
-            # 如果是人声不做识别，直接返回single
-            task.data["v4_infer"] = ["single"] * len(task.data["td"])
         else:
             r = self(task.data["v4_pre"])[0]
             out = np.array(titles)[np.argmax(r,axis=1)]

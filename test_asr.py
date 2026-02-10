@@ -152,18 +152,18 @@ class Test(unittest.TestCase):
             模拟文件模式
 
         '''
-        wav_fname = TEST_EN_MIDDLE
+        wav_fname = TEST_726
         batch_size = 64
+        todo = mid.DO_ASR_ENCODE | mid.DO_ASR_PREDICTOR | mid.DO_ASR_DECODE | mid.DO_ASR_STAMP | mid.DO_SENSEVOICE | \
+              mid.DO_VOICEPRINT |mid.DO_4CLS | mid.DO_T5_ENCODER | mid.DO_T5_DEC1ST | mid.DO_T5_DECKVS
 
-        with APipeWrap(
-            model_mask=mid.DO_ASR_ENCODE | mid.DO_ASR_PREDICTOR | mid.DO_ASR_DECODE | mid.DO_ASR_STAMP | mid.DO_SENSEVOICE | mid.DO_VOICEPRINT |mid.DO_4CLS | mid.DO_T5_ENCODER | mid.DO_T5_DEC1ST | mid.DO_T5_DECKVS,
-            debug=False,
-        ) as pipe:
+        with APipeWrap(model_mask=todo, profile=True) as pipe:
+        
             sess = ASRRunner(pipe, batch_size=batch_size)
             pcm, sr = soundfile.read(wav_fname, dtype="float32", frames=-1)
             with TimeUsed(f"asr_update_file B:{batch_size}, duration:{len(pcm)/16000:.03f} seconds"):
-                asr_result = sess.update_file(pcm)
-
+                __, __, asr_result = sess.update_file(pcm)
+        
         ## 存储为 audacity 标签文件
         with open(osp.join(RESULT_PATH, "test_asr_726_file.txt"), "w") as f:
 
