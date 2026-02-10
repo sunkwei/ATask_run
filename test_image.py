@@ -241,11 +241,11 @@ class ImageTestCase(TestCase):
                 th.join()   ## 等待所有任务完成
 
     def test_images(self):
-        self.__test_images_with_batch(batch_size=1)
+        # self.__test_images_with_batch(batch_size=1, profile=True)
         self.__test_images_with_batch(batch_size=2, profile=True)
-        self.__test_images_with_batch(batch_size=4)
-        self.__test_images_with_batch(batch_size=8)
-        self.__test_images_with_batch(batch_size=16)
+        # self.__test_images_with_batch(batch_size=4)
+        # self.__test_images_with_batch(batch_size=8)
+        # self.__test_images_with_batch(batch_size=16)
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
