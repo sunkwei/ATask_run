@@ -131,7 +131,7 @@ class CTPostProcess(object):
                     binary = np.zeros(label.shape, dtype="uint8")
                     binary[ind] = 1
                     try:
-                        _, contours, _ = cv2.findContours(
+                        _, contours, _ = cv2.findContours(  ## type: ignore
                             binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
                         )
                     except BaseException:
@@ -140,6 +140,8 @@ class CTPostProcess(object):
                         )
 
                     bbox = contours[0] * scale
+                else:
+                    raise NotImplementedError
 
                 bbox = bbox.astype("int32")
                 bboxes.append(bbox.reshape(-1, 2))

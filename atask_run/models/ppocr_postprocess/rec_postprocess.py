@@ -253,7 +253,7 @@ class DistillationCTCLabelDecode(CTCLabelDecode):
         self.key = key
         self.multi_head = multi_head
 
-    def __call__(self, preds, label=None, *args, **kwargs):
+    def __call__(self, preds, label=None, *args, **kwargs):  ## type: ignore
         output = dict()
         for name in self.model_name:
             pred = preds[name]
@@ -278,7 +278,7 @@ class AttnLabelDecode(BaseRecLabelDecode):
         dict_character = [self.beg_str] + dict_character + [self.end_str]
         return dict_character
 
-    def decode(self, text_index, text_prob=None, is_remove_duplicate=False):
+    def decode(self, text_index, text_prob=None, is_remove_duplicate=False): # type: ignore
         """convert text-index into text-label."""
         result_list = []
         ignored_tokens = self.get_ignored_tokens()
@@ -325,7 +325,7 @@ class AttnLabelDecode(BaseRecLabelDecode):
         label = self.decode(label, is_remove_duplicate=False)
         return text, label
 
-    def get_ignored_tokens(self):
+    def get_ignored_tokens(self): # type: ignore
         beg_idx = self.get_beg_end_flag_idx("beg")
         end_idx = self.get_beg_end_flag_idx("end")
         return [beg_idx, end_idx]
@@ -353,7 +353,7 @@ class RFLLabelDecode(BaseRecLabelDecode):
         dict_character = [self.beg_str] + dict_character + [self.end_str]
         return dict_character
 
-    def decode(self, text_index, text_prob=None, is_remove_duplicate=False):
+    def decode(self, text_index, text_prob=None, is_remove_duplicate=False): # type: ignore
         """convert text-index into text-label."""
         result_list = []
         ignored_tokens = self.get_ignored_tokens()
@@ -408,7 +408,7 @@ class RFLLabelDecode(BaseRecLabelDecode):
             length = [len(res[0]) for res in label]
             return cnt_length, length
 
-    def get_ignored_tokens(self):
+    def get_ignored_tokens(self): # type: ignore
         beg_idx = self.get_beg_end_flag_idx("beg")
         end_idx = self.get_beg_end_flag_idx("end")
         return [beg_idx, end_idx]
@@ -436,7 +436,7 @@ class SEEDLabelDecode(BaseRecLabelDecode):
         dict_character = dict_character + [self.end_str, self.padding_str, self.unknown]
         return dict_character
 
-    def get_ignored_tokens(self):
+    def get_ignored_tokens(self): # type: ignore
         end_idx = self.get_beg_end_flag_idx("eos")
         return [end_idx]
 
@@ -449,7 +449,7 @@ class SEEDLabelDecode(BaseRecLabelDecode):
             assert False, "unsupported type %s in get_beg_end_flag_idx" % beg_or_end
         return idx
 
-    def decode(self, text_index, text_prob=None, is_remove_duplicate=False):
+    def decode(self, text_index, text_prob=None, is_remove_duplicate=False): # type: ignore
         """convert text-index into text-label."""
         result_list = []
         [end_idx] = self.get_ignored_tokens()
@@ -526,7 +526,7 @@ class SRNLabelDecode(BaseRecLabelDecode):
         label = self.decode(label)
         return text, label
 
-    def decode(self, text_index, text_prob=None, is_remove_duplicate=False):
+    def decode(self, text_index, text_prob=None, is_remove_duplicate=False): # type: ignore
         """convert text-index into text-label."""
         result_list = []
         ignored_tokens = self.get_ignored_tokens()
@@ -559,7 +559,7 @@ class SRNLabelDecode(BaseRecLabelDecode):
         dict_character = dict_character + [self.beg_str, self.end_str]
         return dict_character
 
-    def get_ignored_tokens(self):
+    def get_ignored_tokens(self): # type: ignore
         beg_idx = self.get_beg_end_flag_idx("beg")
         end_idx = self.get_beg_end_flag_idx("end")
         return [beg_idx, end_idx]
@@ -612,7 +612,7 @@ class ParseQLabelDecode(BaseRecLabelDecode):
 
         return text, label
 
-    def decode(self, text_index, text_prob=None, raw=False):
+    def decode(self, text_index, text_prob=None, raw=False): # type: ignore
         """convert text-index into text-label."""
         result_list = []
         ignored_tokens = self.get_ignored_tokens()
@@ -635,7 +635,7 @@ class ParseQLabelDecode(BaseRecLabelDecode):
                     continue
                 char_list.append(self.character[int(index[idx])])
                 if text_prob is not None:
-                    conf_list.append(prob[idx])
+                    conf_list.append(prob[idx]) # type: ignore
                 else:
                     conf_list.append(1)
 
@@ -685,7 +685,7 @@ class SARLabelDecode(BaseRecLabelDecode):
         self.padding_idx = len(dict_character) - 1
         return dict_character
 
-    def decode(self, text_index, text_prob=None, is_remove_duplicate=False):
+    def decode(self, text_index, text_prob=None, is_remove_duplicate=False): # type: ignore
         """convert text-index into text-label."""
         result_list = []
         ignored_tokens = self.get_ignored_tokens()
@@ -758,7 +758,7 @@ class SATRNLabelDecode(BaseRecLabelDecode):
         self.padding_idx = len(dict_character) - 1
         return dict_character
 
-    def decode(self, text_index, text_prob=None, is_remove_duplicate=False):
+    def decode(self, text_index, text_prob=None, is_remove_duplicate=False): # type: ignore
         """convert text-index into text-label."""
         result_list = []
         ignored_tokens = self.get_ignored_tokens()
@@ -835,7 +835,7 @@ class DistillationSARLabelDecode(SARLabelDecode):
         self.key = key
         self.multi_head = multi_head
 
-    def __call__(self, preds, label=None, *args, **kwargs):
+    def __call__(self, preds, label=None, *args, **kwargs): # type: ignore
         output = dict()
         for name in self.model_name:
             pred = preds[name]
@@ -865,7 +865,7 @@ class PRENLabelDecode(BaseRecLabelDecode):
 
         return dict_character
 
-    def decode(self, text_index, text_prob=None):
+    def decode(self, text_index, text_prob=None): # type: ignore
         """convert text-index into text-label."""
         result_list = []
         batch_size = len(text_index)
@@ -934,7 +934,7 @@ class NRTRLabelDecode(BaseRecLabelDecode):
         dict_character = ["blank", "<unk>", "<s>", "</s>"] + dict_character
         return dict_character
 
-    def decode(self, text_index, text_prob=None, is_remove_duplicate=False):
+    def decode(self, text_index, text_prob=None, is_remove_duplicate=False): # type: ignore
         """convert text-index into text-label."""
         result_list = []
         batch_size = len(text_index)
@@ -1022,7 +1022,7 @@ class CANLabelDecode(BaseRecLabelDecode):
     def __init__(self, character_dict_path=None, use_space_char=False, **kwargs):
         super(CANLabelDecode, self).__init__(character_dict_path, use_space_char)
 
-    def decode(self, text_index, preds_prob=None):
+    def decode(self, text_index, preds_prob=None): # type: ignore
         result_list = []
         batch_size = len(text_index)
         for batch_idx in range(batch_size):
@@ -1232,7 +1232,7 @@ class UniMERNetDecode(object):
                             tokens = [token]
                         is_last_special = is_special
                     if tokens:
-                        self._add_tokens(tokens, special_tokens=is_last_special)
+                        self._add_tokens(tokens, special_tokens=is_last_special) # type: ignore
 
     def _add_tokens(self, new_tokens, special_tokens=False) -> int:
         if special_tokens:
@@ -1280,7 +1280,7 @@ class UniMERNetDecode(object):
         tokens = []
         for index in ids:
             index = int(index)
-            if skip_special_tokens and index in self.all_special_ids:
+            if skip_special_tokens and index in self.all_special_ids: # type: ignore
                 continue
             tokens.append(self.tokenizer.id_to_token(index))
         return tokens

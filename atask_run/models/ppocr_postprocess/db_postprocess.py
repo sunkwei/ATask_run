@@ -121,6 +121,8 @@ class DBPostProcess(object):
             img, contours, _ = outs[0], outs[1], outs[2]
         elif len(outs) == 2:
             contours, _ = outs[0], outs[1]
+        else:
+            raise RuntimeError("Number of contours is not valid")
 
         num_contours = min(len(contours), self.max_candidates)
 
@@ -159,8 +161,8 @@ class DBPostProcess(object):
     def unclip(self, box, unclip_ratio):
         poly = Polygon(box)
         distance = poly.area * unclip_ratio / poly.length
-        offset = pyclipper.PyclipperOffset()
-        offset.AddPath(box, pyclipper.JT_ROUND, pyclipper.ET_CLOSEDPOLYGON)
+        offset = pyclipper.PyclipperOffset()                        ## type: ignore
+        offset.AddPath(box, pyclipper.JT_ROUND, pyclipper.ET_CLOSEDPOLYGON) ## type: ignore
         expanded = offset.Execute(distance)
         return expanded
 
@@ -199,9 +201,8 @@ class DBPostProcess(object):
         mask = np.zeros((ymax - ymin + 1, xmax - xmin + 1), dtype=np.uint8)
         box[:, 0] = box[:, 0] - xmin
         box[:, 1] = box[:, 1] - ymin
-        cv2.fillPoly(mask, box.reshape(1, -1, 2).astype("int32"), 1)
+        cv2.fillPoly(mask, box.reshape(1, -1, 2).astype("int32"), 1) ## type: ignore
         return cv2.mean(bitmap[ymin : ymax + 1, xmin : xmax + 1], mask)[0]
-
     def box_score_slow(self, bitmap, contour):
         """
         box_score_slow: use polyon mean score as the mean score
@@ -220,7 +221,7 @@ class DBPostProcess(object):
         contour[:, 0] = contour[:, 0] - xmin
         contour[:, 1] = contour[:, 1] - ymin
 
-        cv2.fillPoly(mask, contour.reshape(1, -1, 2).astype("int32"), 1)
+        cv2.fillPoly(mask, contour.reshape(1, -1, 2).astype("int32"), 1) ## type: ignore
         return cv2.mean(bitmap[ymin : ymax + 1, xmin : xmax + 1], mask)[0]
 
     def __call__(self, outs_dict, shape_list):
