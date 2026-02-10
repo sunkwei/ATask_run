@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptool>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "atask_run"
+version = "0.1.0"
+authors = [
+    {name = "sunkw", email = "sunwei@zonekey.com.cn"}, 
+    {name = "sundy", email = "sundy@zonekey.com.cn"}
+]
+description = "an AI pre/infer/post pipe manager"
+readme = "README.md"
+licenes = {text = "MIT"}
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT Liicense",
+]
+dependencies = [
+    "numpy" >= 1.21,
+    "onnxruntime" >= 1.19,
+    "faiss_cpu",
+    "infomap",
+    "jieba",
+    "kaldi_native_fbank",
+    "librosa",
+    "nivid_ml_py",
+    "opencv_python_headless",
+    "psutil",
+    "pynaml",
+    "python_Levenshtein",
+    "PyYAML",
+    "scikit_learn",
+    "sentencepiece",
+    "setuptools",
+    "soundfile",
+    "tokenizers",
+]
+
+[project.urls]
+Homepage = "https://github.com/sunkwei/ATask_run
