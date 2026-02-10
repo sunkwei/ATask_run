@@ -1,35 +1,36 @@
 [build-system]
-requires = ["setuptool>=42", "wheel"]
+requires = [
+    "setuptools", 
+    "wheel"
+]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "atask_run"
 version = "0.1.0"
 authors = [
-    {name = "sunkw", email = "sunwei@zonekey.com.cn"}, 
-    {name = "sundy", email = "sundy@zonekey.com.cn"}
+    {name = "sunkw", email = "sunwei@zonekey.com.cn"},
+    {name = "sundy", email = "sundy@zonekey.com.cn"},
 ]
 description = "an AI pre/infer/post pipe manager"
 readme = "README.md"
-licenes = {text = "MIT"}
+license = "MIT"
 requires-python = ">=3.8"
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT Liicense",
 ]
 dependencies = [
     "numpy",
     "onnxruntime",
-    "faiss_cpu",
+    "faiss-cpu",
     "infomap",
     "jieba",
     "kaldi_native_fbank",
     "librosa",
-    "nivid_ml_py",
-    "opencv_python_headless",
+    "opencv-python-headless",
     "psutil",
-    "pynaml",
-    "python_Levenshtein",
+    "pynvml",
+    "python-Levenshtein",
     "PyYAML",
     "scikit_learn",
     "sentencepiece",
@@ -38,5 +39,10 @@ dependencies = [
     "tokenizers",
 ]
 
+[tool.setuptools.packages.find]
+where = ["."]  # 当前目录
+include = ["atask_run*"]  # 只包含 atask_run
+exclude = ["config", "config_temp", "wav", "model", "picture", "run"]
+
 [project.urls]
-Homepage = "https://github.com/sunkwei/ATask_run
+Homepage = "https://github.com/sunkwei/ATask_run"

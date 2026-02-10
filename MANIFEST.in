@@ -1,0 +1,6 @@
+include config/README
+include config_temp/README
+include model/README
+include run/cache/README
+include wav/README
+include picture/README
