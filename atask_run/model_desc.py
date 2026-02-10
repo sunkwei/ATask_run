@@ -301,6 +301,16 @@ def build_default_model_configs(
         ],
         [mid.DO_T5_ENCODER, mid.DO_T5_DEC1ST],
     )
+
+    save(
+        "classtype",
+        mid.DO_CLASSTYPE,
+        [
+            {"name": "input", "dtype":"float32", "shape": [1, 3, 360, 640],},
+        ],
+        [],
+    )
+
     return None
 
 if __name__ == "__main__":
