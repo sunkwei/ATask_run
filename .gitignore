@@ -8,3 +8,6 @@ config_temp/
 *.txt
 wav/
 picture/
+PKG-INFO
+*.whl
+*.tar.gz
