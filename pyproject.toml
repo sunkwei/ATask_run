@@ -18,8 +18,8 @@ classifiers = [
     "License :: OSI Approved :: MIT Liicense",
 ]
 dependencies = [
-    "numpy" >= 1.21,
-    "onnxruntime" >= 1.19,
+    "numpy",
+    "onnxruntime",
     "faiss_cpu",
     "infomap",
     "jieba",
