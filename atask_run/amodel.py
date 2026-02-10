@@ -17,7 +17,7 @@ from .backend.ort import OnnxruntimeBackend
 import logging
 import numpy as np
 
-logger = logging.getLogger("asr_runner")
+logger = logging.getLogger("amodel")
 
 class AModel:
     def __init__(
@@ -87,14 +87,29 @@ class AModel:
                     }
 
                 impl = OnnxruntimeBackend()
-                impl.setup(backend["model_path"], **backend["backend_cfg"])
-                ratio = float(backend["backend_cfg"].get("balance_ratio", 1.0))
-                self.__balance_ratios[i] = ratio
+                model_path = backend["backend_cfg"].get("model_path", backend["model_path"])
+                impl.setup(model_path, **backend["backend_cfg"])
 
+            elif backend["type"] == "ascend_om":
+                if not "backend_cfg" in backend:
+                    raise ValueError("backend type is required")
+                    '''
+                    backend_cfg: {
+                        "device_id": 0,
+                        "enable_cann_graph": True,
+                        "model_path": act.om,
+                    }
+                    '''
+                from .backend.ascend_om import OMBackend
+                impl = OMBackend()
+                model_path = backend["backend_cfg"].get("model_path", backend["model_path"])
+                impl.setup(model_path, **backend["backend_cfg"])
             else:
                 # TODO: 实现其它的 backend
                 raise NotImplementedError
             
+            ratio = float(backend["backend_cfg"].get("balance_ratio", 1.0))
+            self.__balance_ratios[i] = ratio
             self.__backend_impls.append(impl)
 
     def __del__(self):
