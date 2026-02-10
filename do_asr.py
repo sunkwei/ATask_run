@@ -114,7 +114,7 @@ class ASRRunner:
 
         return asr_result
 
-    def update_file(self, pcm: np.ndarray) -> list:
+    def update_file(self, pcm: np.ndarray) -> tuple[dict, dict, dict]:
         '''
             适合一次 asr 处理一节课
             先做 Vad 得到所有片段，然后扔到 APipe 中，启动一个工作线程，接受结果
