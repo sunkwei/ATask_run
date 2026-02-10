@@ -86,9 +86,24 @@ class TimeUsedSum:
 
     def dump(self):
         print("================= there are %d items =============="%len(self.items))
+        pre_time_total = 0.0
+        infer_time_total = 0.0
+        post_time_total = 0.0
         for _,v in self.items.items():
+            if "pre" in v.name:
+                pre_time_total += v.total_duration
+            elif "infer" in v.name:
+                infer_time_total += v.total_duration
+            elif "post" in v.name:
+                post_time_total += v.total_duration
+            
             print(f"  {v}")
 
+        print ("###################total time used ####################")
+        print(f"  pre: {pre_time_total:.03f} secs")
+        print(f"  infer: {infer_time_total:.03f} secs")
+        print(f"  post: {post_time_total:.03f} secs")
+        
 class TimeUsed:
     def __init__(self, name, with_cpu:bool=False, with_cuda:bool=False, cuda_device_id:int=0):
         self.name = name

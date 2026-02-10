@@ -125,7 +125,7 @@ class APipe:
         self.E_infer = AExecutor(
             "infer", find_model, 
             self.Q_pre, self.Q_infer, 
-            3,
+            E_infer_num_thread,
             debug=self.debug,
             profile=self.profile,
         )
