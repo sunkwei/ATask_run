@@ -3,13 +3,13 @@
 '''
 from .amodel_impl import AModelBackend
 from typing import List, Any, Tuple
-from ais_bench.infer.inferface import InferSession
 
 class OMBackend(AModelBackend):
     def setup(self, model_path: str, **kwargs):
         self.model_path = model_path
         device_id = kwargs.get("device_id", 0)
         self.infer_mode = kwargs.get("infer_mode", "dymbatch")
+        from ais_bench.infer.inferface import InferSession
         self.sess = InferSession(device_id, model_path)
         self.input_desc = self.sess.get_inputs()
         self.output_desc = self.sess.get_outputs()
