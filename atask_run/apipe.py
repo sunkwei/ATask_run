@@ -231,8 +231,8 @@ class APipe:
             module = importlib.import_module(f".models.{name}", package=__package__)
             cls = getattr(module, f"Model_{name}")
             model = cls(**cfg)
-            logger.info(f"APipe: load_models: load {name} success, {model}")
-            print (f"Load {name} success")
+            # logger.info(f"APipe: load_models: load {name} success, {model}")
+            # print (f"Load {name} success")
             models.append((mid, model))
 
         return models

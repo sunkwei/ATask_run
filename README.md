@@ -8,6 +8,8 @@
     cd ./model
     rsync -azP /media/nas/work/model/ .
 
+模型可以从[百度云盘](https://pan.baidu.com/s/1ZaKc36IXex2mM-lSxXlErQ?pwd=e3ms)下载，里面包含了行为，人脸相关模型，也包含了 [BiCifParaformer](https://www.modelscope.cn/models/iic/speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-pytorch/summary) 模型导出的 enccode, decode, predictor, stamp 模型等等 ...
+
 ## 生成模型配置模板
 
 ``` text
@@ -169,3 +171,8 @@ class APipe:
     def wait(self) -> ATask: ...            ## 等待下一个完成的任务，注意，不一定按照 post 的顺序返回!!!
     def get_qsize(self) -> Tuple[int, int, int, int]: ...  ## 返回四个 queue 的等待数，一定程度上可以用于评估性能瓶颈
 ```
+
+## 测试
+
+    python test_image.py
+    python test.py --test_all

@@ -1,3 +1,19 @@
 该目录存储所有模型
  - onnx_quant: 存储 cpu 量化模型
  - onnx_f32: 存储 f32 的 onnx 非量化模型
+
+好吧，模型从 https://pan.baidu.com/s/1ZaKc36IXex2mM-lSxXlErQ?pwd=e3ms 提取码: e3ms 百度链接下载吧
+
+目前模型包含：
+act.onnx: 行为检测模型
+facedet.onnx: 人脸检测模型
+face_score.onnx: 人脸质量得分模型
+faceori.onnx: 人脸106特征点模型
+facerec.onnx：人脸特征向量模型
+raisehandcls.onnx: 行为细分网络 ...
+
+以下 asr 模型来自 https://www.modelscope.cn/models/iic/speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-pytorch/summary
+asr_enc.onnx asr_predictor.onnx asr_dec.onnx asr_stamp.onnx 根据 BiCifParaformer 导出的四个 onnx
+asr_vad.onnx: 语音检测切片模型
+
+....

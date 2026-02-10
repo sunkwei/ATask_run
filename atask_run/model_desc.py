@@ -37,7 +37,7 @@ def load_model_config(
     from pathlib import Path
     P = Path(config_path)
     cfgs = []
-    for f in P.glob("*.yaml"):
+    for f in sorted(list(P.glob("*.yaml"))):
         with open(f, encoding="utf8") as f:
          cfg = yaml.load(f, Loader=yaml.loader.FullLoader)
         if "mid" not in cfg or "model_path" not in cfg or "name" not in cfg:
