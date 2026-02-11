@@ -12,6 +12,8 @@ from .ppocr_postprocess.rec_postprocess import CTCLabelDecode
 logger = logging.getLogger("ocr_rec")
 
 class Model_ocr_rec(AModel):
+    width_segs = [64, 128, 192, 256, 384, 512, 768, 1024, 1280, 1600]
+
     def _preprocess(self, task: ATask):
         ''' 
         ppOCRv5 的 text rec 预处理：
@@ -21,6 +23,8 @@ class Model_ocr_rec(AModel):
             1. 根据 task.data["ocr_det_result"] 抠图，需要处理旋转情况
             2. 每个图，保持比例，高缩放到 48 像素
             3. 将图像根据最长，做padding, 构造批次？如果长短差别太大，是不是应该使用“桶”？
+
+            为了支持 tensorRT，长度最好分几个段
         '''
         assert "ocr_det_result" in task.data
         task.data["ocr_rec_inps"] = []
@@ -42,11 +46,17 @@ class Model_ocr_rec(AModel):
                 inps.append(inp)
 
             ## 将 inps 中所有 inp 扩展到 max_fw 宽度，不足部分填充 
-            max_fw = (max_fw + 31) // 32 * 32
+            ## 从 self.width_segs 中选择一个合适的宽度
+            target_width = self.width_segs[-1]
+            for w in self.width_segs[:-1]:
+                if w >= max_fw:
+                    target_width = w
+                    break
+
             for i in range(len(inps)):
                 ## inp: (1, 3, H, W), 扩展 W 到 fw
-                if inps[i].shape[-1] < max_fw:
-                    pad_w = max_fw - inps[i].shape[-1]
+                if inps[i].shape[-1] < target_width:
+                    pad_w = target_width - inps[i].shape[-1]
                     inps[i] = np.pad(inps[i], ((0, 0), (0, 0), (0, 0), (0, pad_w)), mode="constant", constant_values=0)
 
             task.data["ocr_rec_inps"].append(np.vstack(inps))

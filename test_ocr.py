@@ -8,7 +8,7 @@ import cv2
 
 class TestOcr(TestCase):
     def test_ocr_det(self):
-        img = cv2.imread("picture/ocr2.jpg")
+        img = cv2.imread("picture/ocr.jpg")
         if img.size == 0:
             raise FileNotFoundError("picture/ocr.jpg not found")
         
