@@ -47,6 +47,7 @@ class BaseRecLabelDecode(object):
         for i, char in enumerate(dict_character):
             self.dict[char] = i
         self.character = dict_character
+        self.character.append(' ')   ## FIXME: 奇怪，如果不增加这个，不支持输出空格 ...
 
     def pred_reverse(self, pred):
         pred_re = []
@@ -195,7 +196,6 @@ class BaseRecLabelDecode(object):
     def get_ignored_tokens(self):
         return [0]  # for ctc blank
 
-
 class CTCLabelDecode(BaseRecLabelDecode):
     """Convert between text-label and text-index"""
 
@@ -226,7 +226,6 @@ class CTCLabelDecode(BaseRecLabelDecode):
     def add_special_char(self, dict_character):
         dict_character = ["blank"] + dict_character
         return dict_character
-
 
 class DistillationCTCLabelDecode(CTCLabelDecode):
     """
@@ -263,7 +262,6 @@ class DistillationCTCLabelDecode(CTCLabelDecode):
                 pred = pred["ctc"]
             output[name] = super().__call__(pred, label=label, *args, **kwargs)
         return output
-
 
 class AttnLabelDecode(BaseRecLabelDecode):
     """Convert between text-label and text-index"""
@@ -338,7 +336,6 @@ class AttnLabelDecode(BaseRecLabelDecode):
         else:
             assert False, "unsupported type %s in get_beg_end_flag_idx" % beg_or_end
         return idx
-
 
 class RFLLabelDecode(BaseRecLabelDecode):
     """Convert between text-label and text-index"""
@@ -422,7 +419,6 @@ class RFLLabelDecode(BaseRecLabelDecode):
             assert False, "unsupported type %s in get_beg_end_flag_idx" % beg_or_end
         return idx
 
-
 class SEEDLabelDecode(BaseRecLabelDecode):
     """Convert between text-label and text-index"""
 
@@ -498,7 +494,6 @@ class SEEDLabelDecode(BaseRecLabelDecode):
         label = self.decode(label, is_remove_duplicate=False)
         return text, label
 
-
 class SRNLabelDecode(BaseRecLabelDecode):
     """Convert between text-label and text-index"""
 
@@ -572,7 +567,6 @@ class SRNLabelDecode(BaseRecLabelDecode):
         else:
             assert False, "unsupported type %s in get_beg_end_flag_idx" % beg_or_end
         return idx
-
 
 class ParseQLabelDecode(BaseRecLabelDecode):
     """Convert between text-label and text-index"""
@@ -663,7 +657,6 @@ class ParseQLabelDecode(BaseRecLabelDecode):
     def get_ignored_tokens(self):
         return [self.dict[self.BOS], self.dict[self.EOS], self.dict[self.PAD]]
 
-
 class SARLabelDecode(BaseRecLabelDecode):
     """Convert between text-label and text-index"""
 
@@ -735,7 +728,6 @@ class SARLabelDecode(BaseRecLabelDecode):
 
     def get_ignored_tokens(self):
         return [self.padding_idx]
-
 
 class SATRNLabelDecode(BaseRecLabelDecode):
     """Convert between text-label and text-index"""
@@ -809,7 +801,6 @@ class SATRNLabelDecode(BaseRecLabelDecode):
     def get_ignored_tokens(self):
         return [self.padding_idx]
 
-
 class DistillationSARLabelDecode(SARLabelDecode):
     """
     Convert
@@ -845,7 +836,6 @@ class DistillationSARLabelDecode(SARLabelDecode):
                 pred = pred["sar"]
             output[name] = super().__call__(pred, label=label, *args, **kwargs)
         return output
-
 
 class PRENLabelDecode(BaseRecLabelDecode):
     """Convert between text-label and text-index"""
@@ -900,7 +890,6 @@ class PRENLabelDecode(BaseRecLabelDecode):
             return text
         label = self.decode(label)
         return text, label
-
 
 class NRTRLabelDecode(BaseRecLabelDecode):
     """Convert between text-label and text-index"""
@@ -957,7 +946,6 @@ class NRTRLabelDecode(BaseRecLabelDecode):
             result_list.append((text, np.mean(conf_list).tolist()))
         return result_list
 
-
 class ViTSTRLabelDecode(NRTRLabelDecode):
     """Convert between text-label and text-index"""
 
@@ -977,7 +965,6 @@ class ViTSTRLabelDecode(NRTRLabelDecode):
     def add_special_char(self, dict_character):
         dict_character = ["<s>", "</s>"] + dict_character
         return dict_character
-
 
 class ABINetLabelDecode(NRTRLabelDecode):
     """Convert between text-label and text-index"""
@@ -1001,7 +988,6 @@ class ABINetLabelDecode(NRTRLabelDecode):
     def add_special_char(self, dict_character):
         dict_character = ["</s>"] + dict_character
         return dict_character
-
 
 class SPINLabelDecode(AttnLabelDecode):
     """Convert between text-label and text-index"""
@@ -1046,7 +1032,6 @@ class CANLabelDecode(BaseRecLabelDecode):
         label = self.decode(label)
         return text, label
 
-
 class CPPDLabelDecode(NRTRLabelDecode):
     """Convert between text-label and text-index"""
 
@@ -1071,7 +1056,6 @@ class CPPDLabelDecode(NRTRLabelDecode):
     def add_special_char(self, dict_character):
         dict_character = ["</s>"] + dict_character
         return dict_character
-
 
 class LaTeXOCRDecode(object):
     """Convert between latex-symbol and symbol-index"""
@@ -1127,7 +1111,6 @@ class LaTeXOCRDecode(object):
             return text
         label = self.decode(np.array(label))
         return text, label
-
 
 class UniMERNetDecode(object):
 

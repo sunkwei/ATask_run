@@ -8,7 +8,6 @@ import threading
 import unittest
 from atask_run.timeused import TimeUsed, TimeUsedSum
 from atask_run.models.asr_vad import Model_asr_vad
-from do_asr import ASRRunner
 import soundfile, re
 
 # 如果 windows 平台，需要使用不同的路径
@@ -122,6 +121,7 @@ class Test(unittest.TestCase):
             None: 结果将保存到RESULT_PATH/test_asr_726_stream.txt文件中
         """
         wav_fname = TEST_726
+        from do_asr import ASRRunner
         with APipeWrap(
             model_mask=mid.DO_ASR_ENCODE | mid.DO_ASR_PREDICTOR | mid.DO_ASR_DECODE | mid.DO_ASR_STAMP
         ) as pipe:
@@ -152,6 +152,7 @@ class Test(unittest.TestCase):
             模拟文件模式
 
         '''
+        from do_asr import ASRRunner
         wav_fname = TEST_EN_MIDDLE
         batch_size = 64
 

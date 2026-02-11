@@ -154,9 +154,9 @@ class DBPostProcess(object):
             box[:, 1] = np.clip(
                 np.round(box[:, 1] / height * dest_height), 0, dest_height
             )
-            boxes.append(box.astype("int32"))
+            boxes.append(box)
             scores.append(score)
-        return np.array(boxes, dtype="int32"), scores
+        return np.array(boxes, dtype=np.float32), scores
 
     def unclip(self, box, unclip_ratio):
         poly = Polygon(box)

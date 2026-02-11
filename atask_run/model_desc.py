@@ -311,6 +311,24 @@ def build_default_model_configs(
         [],
     )
 
+    save(
+        "ocr_det",
+        mid.DO_OCR_DET,
+        [
+            {"name": "input", "dtype": "float32", "shape": [-1, 3, -1, -1]},
+        ],
+        [],
+    )
+
+    save(
+        "ocr_rec",
+        mid.DO_OCR_REC,
+        [
+            {"name": "input", "dtype": "float32", "shape": [-1, 3, 48, -1]},
+        ],
+        [mid.DO_OCR_DET],
+    )
+
     return None
 
 if __name__ == "__main__":
