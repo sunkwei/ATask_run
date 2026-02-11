@@ -98,6 +98,6 @@ class Model_ocr_det(AModel):
             pred_dict = {"maps": pred}
             boxes = self.db_post_impl(pred_dict, shape_list)[0]["points"]
             ratio = task.data["ocr_det_inps"][b][1]
-            boxes = boxes * ratio
+            boxes = boxes / ratio       ## 还原到原图坐标
             results.append(boxes.astype(np.int32))
         task.data["ocr_det_result"] = results
