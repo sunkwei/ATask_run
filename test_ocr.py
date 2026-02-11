@@ -8,11 +8,11 @@ import cv2
 
 class TestOcr(TestCase):
     def test_ocr_det(self):
-        img = cv2.imread("picture/ocr.jpg")
+        img = cv2.imread("picture/ocr3.jpg")
         if img.size == 0:
             raise FileNotFoundError("picture/ocr.jpg not found")
         
-        with APipeWrap(mid.DO_OCR_DET | mid.DO_OCR_REC) as pipe:
+        with APipeWrap(mid.DO_OCR_DET | mid.DO_OCR_REC, profile=True) as pipe:
             with TimeUsed("ocr_det"):
                 task = ATask(mid.DO_OCR_DET | mid.DO_OCR_REC, img, userdata={})
                 pipe.post_task(task)

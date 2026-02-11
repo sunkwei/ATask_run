@@ -100,9 +100,9 @@ class TimeUsedSum:
             print(f"  {v}")
 
         print ("###################total time used ####################")
-        print(f"  pre: {pre_time_total:.03f} secs")
-        print(f"  infer: {infer_time_total:.03f} secs")
-        print(f"  post: {post_time_total:.03f} secs")
+        print(f"  pre: {pre_time_total:.05f} secs")
+        print(f"  infer: {infer_time_total:.05f} secs")
+        print(f"  post: {post_time_total:.05f} secs")
         
 class TimeUsed:
     def __init__(self, name, with_cpu:bool=False, with_cuda:bool=False, cuda_device_id:int=0):
