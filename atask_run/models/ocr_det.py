@@ -14,6 +14,9 @@ logger = logging.getLogger("ocr_det")
 class Model_ocr_det(AModel):
     def _preprocess(self, task: ATask):
         '''
+        TODO: 需要支持较固定几个大小的输入，如 960x544, 1280x720, 640x360 等
+
+
         ppOCRv5 的 text detect 预处理：
             bgr -> rgb -> float32
             img /= 255.0
@@ -24,40 +27,47 @@ class Model_ocr_det(AModel):
         '''
         mean = np.array([0.485, 0.456, 0.406], np.float32)
         std = np.array([0.229, 0.224, 0.225], np.float32)
-
-        def prepare_img_align(image0: np.ndarray, align: int = 32) -> Tuple[np.ndarray, float]:
-            """
-            将输入图像按比例缩放到 `align` 的整数倍，保持宽高比，并返回缩放后的图像及缩放比例。
-            
-            Args:
-                image0: 输入图像 (H, W, C) 或 (H, W)，格式为 np.uint8 或 np.float32。
-                align:  目标尺寸对齐的倍数（默认32）。
-            
-            Returns:
-                Tuple[np.ndarray, float]: (缩放后的图像, 缩放比例)
-            """
-            h, w = image0.shape[:2]
-            
-            # 计算缩放比例（长边不超过 align 的倍数，同时保持宽高比）
-            target_max_size = max(h, w)
-            ratio = align * (target_max_size // align + (1 if target_max_size % align != 0 else 0)) / target_max_size
-            new_h, new_w = int(h * ratio), int(w * ratio)
-            
-            # 调整尺寸到 align 的倍数（向上取整）
-            new_h = (new_h + align - 1) // align * align
-            new_w = (new_w + align - 1) // align * align
-            
-            # 实际缩放比例（可能因向上取整略有变化）
-            actual_ratio_h = new_h / h
-            actual_ratio_w = new_w / w
-            actual_ratio = (actual_ratio_h + actual_ratio_w) / 2  # 取平均值
-            
-            # 使用 INTER_AREA 缩小时抗锯齿
-            resized_img = cv2.resize(image0, (new_w, new_h), interpolation=cv2.INTER_AREA if ratio < 1 else cv2.INTER_LINEAR)    
-            return resized_img, actual_ratio  # 返回缩放后的图像和还原比例（ratio）
         
+        def prepare_image(
+            image: np.ndarray, 
+            sizes=[(640,384), (960,544), (1280,736)]
+        ) -> Tuple[np.ndarray, float]:
+            
+            ## FIXME: sizes 总是从小到大
+            ## 模型输入需要 32 整除
+            assert len(sizes) > 0
+            h, w = image.shape[:2]
+
+            ## 反序找到比 (w, h) 小的目标尺寸
+            target_w, target_h = sizes[0]
+
+            if w < sizes[0][0] and h <= sizes[0][1]:
+                pass
+            else:
+                for tw, th in reversed(sizes):
+                    if w < tw and h < th:
+                        continue
+
+                    if w <= tw or h <= th:
+                        target_w = tw; target_h = th
+                        break
+
+            # 计算缩放比例（保持比例，且不放大）
+            scale = min(target_w / w, target_h / h, 1.0)
+            new_w, new_h = int(w * scale), int(h * scale)
+
+            # 缩放图像
+            resized = cv2.resize(image, (new_w, new_h), interpolation=cv2.INTER_AREA)
+
+            # 左上角填充
+            canvas = np.zeros((target_h, target_w, 3), dtype=np.uint8)
+            canvas[0:new_h, 0:new_w] = resized
+
+            return canvas, scale
+
         def do_pre(bgr:np.ndarray) -> Tuple[np.ndarray, float]:
-            bgr, ratio = prepare_img_align(bgr)
+            # bgr, ratio = prepare_img_align(bgr)
+            bgr, ratio = prepare_image(bgr)
             img = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB).astype(np.float32) / 255.0
             img = (img - mean) / std
             img = img.transpose((2, 0, 1))
